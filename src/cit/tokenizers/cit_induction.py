@@ -1,110 +1,195 @@
-from dataclasses import dataclass
-from typing import List, Tuple, Set
-import random
+from __future__ import annotations
 
-from .cit_contract import apply_contract, Contract
-from .runtime import build_artifact, tokenize_longest_match
-from .probes import estimate_ce
-from .hf_baselines import SPECIALS
+from dataclasses import dataclass
+from typing import Dict, Iterable, List, Tuple
+
+import numpy as np
+from tqdm import tqdm
+
+from .cit_contract import Contract, apply_contract, extract_contract_markers
+from .runtime import tokenize_longest_match
+
 
 @dataclass
 class InductionCfg:
     vocab_size: int = 2048
-    min_freq: int = 20
-    max_cand_len: int = 12
+    min_freq: int = 5
+    max_token_len: int = 16
+    max_texts_for_candidates: int = 20000
+    max_total_candidates: int = 80000
+    score_sample_size: int = 4000
+    # Prefix budgets used by the distortion probe (token-prefix lengths)
+    prefix_ks: Tuple[int, ...] = (16, 32, 64, 128)
     lambda_dist: float = 1.0
     seed: int = 0
-    max_rounds: int = 200  # to keep build time bounded in MVP
 
-def _collect_candidates(texts: List[str], min_freq: int, max_len: int) -> List[str]:
-    # naive contiguous char spans (MVP). You can replace with boundary-respecting spans later.
-    from collections import Counter
-    cnt = Counter()
-    for s in texts:
-        n = len(s)
-        for i in range(n):
-            for l in range(2, min(max_len, n-i)+1):
-                cnt[s[i:i+l]] += 1
-    return [c for c,f in cnt.items() if f >= min_freq]
 
-def train_cit(
-    raw_texts: List[str],
-    y: List[int],
-    contract: Contract,
-    cfg: InductionCfg,
-    val_split: float = 0.2,
-) -> Tuple[object, object]:
-    rng = random.Random(cfg.seed)
-    # contract
+def _collect_candidates(texts: List[str], cfg: InductionCfg) -> Dict[str, int]:
+    """Collect substring candidates from plain segments.
+
+    We treat '<...>' atoms and '=' as hard boundaries and never propose candidates
+    that cross them.
+    """
+    rng = np.random.default_rng(cfg.seed)
+    idx = np.arange(min(len(texts), cfg.max_texts_for_candidates))
+    if len(texts) > len(idx):
+        idx = rng.choice(len(texts), size=len(idx), replace=False)
+
+    counts: Dict[str, int] = {}
+    for i in idx:
+        t = texts[int(i)]
+        # whitespace boundaries
+        for chunk in t.split():
+            # hard boundary atoms are not broken
+            if chunk.startswith("<") and chunk.endswith(">"):
+                counts[chunk] = counts.get(chunk, 0) + 1
+                continue
+            # do not cross '='; split into subchunks
+            for sub in chunk.split("="):
+                if not sub:
+                    continue
+                L = len(sub)
+                for a in range(L):
+                    for b in range(a + 1, min(L, a + cfg.max_token_len) + 1):
+                        s = sub[a:b]
+                        counts[s] = counts.get(s, 0) + 1
+        # also keep separators as tokens if present
+        if "=" in t:
+            counts["="] = counts.get("=", 0) + t.count("=")
+
+        if len(counts) >= cfg.max_total_candidates:
+            break
+
+    # filter by min_freq
+    counts = {k: v for k, v in counts.items() if v >= cfg.min_freq}
+    return counts
+
+
+def _init_vocab(texts: List[str], cfg: InductionCfg) -> Dict[str, int]:
+    vocab: Dict[str, int] = {
+        "[PAD]": 0,
+        "[UNK]": 1,
+        "[CLS]": 2,
+        "[SEP]": 3,
+        "[MASK]": 4,
+    }
+    # contract markers (typed symbols, record markers)
+    markers = set()
+    for t in texts[: min(len(texts), cfg.max_texts_for_candidates)]:
+        markers |= extract_contract_markers(t)
+    for m in sorted(markers):
+        if m not in vocab:
+            vocab[m] = len(vocab)
+    # structural tokens
+    for tok in ["=", "<SEP>", "<REC>", "<END>"]:
+        if tok not in vocab:
+            vocab[tok] = len(vocab)
+    return vocab
+
+
+def _estimate_distortion(
+    texts: List[str],
+    labels: np.ndarray,
+    vocab: Dict[str, int],
+    sample_size: int,
+    prefix_ks: Tuple[int, ...],
+    seed: int,
+) -> float:
+    """Lightweight prefix-aligned interface distortion proxy.
+
+    We approximate directed semantic distortion using a cheap probe that predicts
+    labels from *tokenized prefixes*. Concretely, we average probe cross-entropy
+    over a small set of token-prefix budgets (prefix_ks).
+
+    Note: this is an interface diagnostic, not a deployed model.
+    """
+    from .probes import estimate_prefix_ce
+
+    rng = np.random.default_rng(seed)
+    n = len(texts)
+    m = min(sample_size, n)
+    idx = rng.choice(n, size=m, replace=False)
+
+    token_ids = [tokenize_longest_match(texts[int(i)], vocab) for i in idx]
+    y = labels[idx].tolist()
+
+    # simple deterministic split
+    split = int(0.8 * len(token_ids))
+    tr_ids, va_ids = token_ids[:split], token_ids[split:]
+    y_tr, y_va = y[:split], y[split:]
+    if len(va_ids) == 0:
+        va_ids, y_va = tr_ids, y_tr
+
+    return estimate_prefix_ce(
+        tr_ids,
+        y_tr,
+        va_ids,
+        y_va,
+        vocab_size=max(vocab.values()) + 1,
+        prefix_ks=prefix_ks,
+        seed=seed,
+    )
+
+
+def train_cit(raw_texts: List[str], labels: List[int], contract: Contract, cfg: InductionCfg) -> Tuple[Dict[str, int], Contract]:
+    """Train CIT vocabulary with greedy gain--distortion selection.
+
+    This is a compact reference implementation suitable for experiments.
+    """
+    rng = np.random.default_rng(cfg.seed)
+    y = np.asarray(labels, dtype=np.int64)
+
+    # apply contract
     texts = [apply_contract(t, contract) for t in raw_texts]
 
-    # split
-    idx = list(range(len(texts)))
-    rng.shuffle(idx)
-    n_val = int(len(idx)*val_split)
-    val_idx = set(idx[:n_val])
-    tr_texts = [texts[i] for i in idx[n_val:]]
-    tr_y = [y[i] for i in idx[n_val:]]
-    va_texts = [texts[i] for i in idx[:n_val]]
-    va_y = [y[i] for i in idx[:n_val]]
+    vocab = _init_vocab(texts, cfg)
+    candidates = _collect_candidates(texts, cfg)
 
-    # base vocab: specials + single chars
-    charset: Set[str] = set("".join(tr_texts))
-    vocab_list = SPECIALS + sorted(list(charset))
-    vocab_list = vocab_list[:cfg.vocab_size]  # initial cap
-    art = build_artifact(vocab_list)
+    # current distortion estimate
+    base_dist = _estimate_distortion(texts, y, vocab, cfg.score_sample_size, cfg.prefix_ks, cfg.seed)
 
-    # candidates
-    cands = _collect_candidates(tr_texts, cfg.min_freq, cfg.max_cand_len)
-    # remove any that are already in vocab
-    cands = [c for c in cands if c not in art.vocab]
+    # greedily grow
+    remaining = sorted(candidates.items(), key=lambda kv: kv[1], reverse=True)
 
-    def tok_batch(txts):
-        return [tokenize_longest_match(s, art) for s in txts]
+    pbar = tqdm(total=cfg.vocab_size - len(vocab), desc="train_cit", leave=False)
+    while len(vocab) < cfg.vocab_size and remaining:
+        # sample a small batch of candidates to score (speed)
+        batch = remaining[: 512]
+        remaining = remaining[512:]
 
-    # baseline CE (distortion proxy)
-    tr_ids = tok_batch(tr_texts)
-    va_ids = tok_batch(va_texts)
-    base_ce = estimate_ce(tr_ids, tr_y, va_ids, va_y, vocab_size=len(art.vocab), seed=cfg.seed)
-
-    # greedy add tokens
-    rounds = min(cfg.max_rounds, cfg.vocab_size - len(vocab_list))
-    for _ in range(rounds):
         best = None
-        best_score = -1e18
+        best_score = -1e9
+        best_dist = None
 
-        # sample subset to keep it fast
-        sample = cands if len(cands) <= 200 else rng.sample(cands, 200)
-
-        # current rate
-        cur_len = sum(len(ids) for ids in va_ids) / max(1, len(va_ids))
-
-        for c in sample:
-            # try add
-            new_vocab = art.inv_vocab + [c]
-            new_art = build_artifact(new_vocab)
-            # rate gain (on val)
-            new_va_ids = [tokenize_longest_match(s, new_art) for s in va_texts]
-            new_len = sum(len(ids) for ids in new_va_ids) / max(1, len(new_va_ids))
-            gain = cur_len - new_len
-
-            # distortion increment via probe CE
-            new_tr_ids = [tokenize_longest_match(s, new_art) for s in tr_texts]
-            new_ce = estimate_ce(new_tr_ids, tr_y, new_va_ids, va_y, vocab_size=len(new_art.vocab), seed=cfg.seed)
-            delta = new_ce - base_ce  # <=0 good
-
+        for tok, freq in batch:
+            if tok in vocab:
+                continue
+            # gain proxy: freq weighted by length saved
+            gain = freq * max(1, len(tok) - 1)
+            # estimate new distortion on-the-fly using a small sample
+            tmp_vocab = vocab.copy()
+            tmp_vocab[tok] = len(tmp_vocab)
+            dist = _estimate_distortion(
+                texts,
+                y,
+                tmp_vocab,
+                max(512, cfg.score_sample_size // 4),
+                cfg.prefix_ks,
+                int(rng.integers(1e9)),
+            )
+            delta = dist - base_dist
             score = gain - cfg.lambda_dist * delta
             if score > best_score:
                 best_score = score
-                best = (c, new_art, new_va_ids, new_ce)
+                best = tok
+                best_dist = dist
 
         if best is None:
-            break
-        c, art, va_ids, base_ce = best
-        if c in cands:
-            cands.remove(c)
-        if len(art.vocab) >= cfg.vocab_size:
-            break
+            continue
 
-    return art, contract
+        vocab[best] = len(vocab)
+        base_dist = float(best_dist)
+        pbar.update(1)
 
+    pbar.close()
+    return vocab, contract
