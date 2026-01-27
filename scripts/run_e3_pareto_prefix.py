@@ -79,7 +79,11 @@ def main():
 
     set_seed(args.seed)
 
-    outdir = Path(args.outdir) / f"seed{args.seed}"
+    user_out = Path(args.outdir)
+    if user_out.is_absolute():
+        user_out = Path(user_out.name)
+    outdir = (Path("results") / user_out) / f"seed{args.seed}"
+
     outdir.mkdir(parents=True, exist_ok=True)
     save_run_metadata(outdir, exp_name="e3_pareto", args=vars(args))
     ds = load_adult(args.seed)
