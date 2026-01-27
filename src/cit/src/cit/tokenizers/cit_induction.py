@@ -7,7 +7,7 @@ import numpy as np
 from tqdm import tqdm
 
 from .cit_contract import Contract, apply_contract, extract_contract_markers
-from .runtime import tokenize_longest_match
+from .runtime import LongestMatchTokenizer
 from .metrics import DistortionCfg, estimate_surrogate_distortion, estimate_rate
 
 
@@ -117,10 +117,11 @@ def _estimate_distortion(
         seed=seed,
     )
     vocab_size = max(vocab.values()) + 1
+    tokenizer = LongestMatchTokenizer(vocab=vocab)
     return estimate_surrogate_distortion(
         texts,
         labels.tolist() if isinstance(labels, np.ndarray) else labels,
-        encode_prefix=lambda s: tokenize_longest_match(s, vocab),
+        encode_prefix=tokenizer.encode,
         vocab_size=vocab_size,
         cfg=dcfg,
     )
@@ -133,7 +134,8 @@ def _estimate_rate(texts: List[str], vocab: Dict[str, int], sample_size: int, se
         return 0.0
     m = min(sample_size, n)
     idx = rng.choice(n, size=m, replace=False)
-    token_ids = [tokenize_longest_match(texts[int(i)], vocab) for i in idx]
+    tokenizer = LongestMatchTokenizer(vocab=vocab)
+    token_ids = [tokenizer.encode(texts[int(i)]) for i in idx]
     return estimate_rate(token_ids)
 
 

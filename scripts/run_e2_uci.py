@@ -23,7 +23,7 @@ from cit.data.serialize import SerializeCfg, serialize_df
 from cit.tokenizers.hf_baselines import train_bpe, train_wordpiece, train_unigram
 from cit.tokenizers.cit_contract import Contract, apply_contract
 from cit.tokenizers.cit_induction import train_cit, InductionCfg
-from cit.tokenizers.runtime import tokenize_longest_match
+from cit.tokenizers.runtime import LongestMatchTokenizer
 from cit.models.encoder import TinyEncoder
 from cit.models.train import train_compute_matched
 from cit.models.eval import evaluate
@@ -83,6 +83,7 @@ def main():
         InductionCfg(vocab_size=args.vocab, seed=args.seed),
         log_path=str(outdir / "tokenizers" / "cit" / "induction_log.jsonl"),
     )
+    cit_tok = LongestMatchTokenizer(cit_vocab)
 
     # save tokenizer artifacts
     tok_dir = outdir / "tokenizers"
@@ -100,7 +101,7 @@ def main():
         ("BPE", lambda t: hf_encode(bpe, t)),
         ("WordPiece", lambda t: hf_encode(wp, t)),
         ("Unigram", lambda t: hf_encode(uni, t)),
-        ("CIT", lambda t: [tokenize_longest_match(apply_contract(s, cit_contract), cit_vocab) for s in t]),
+        ("CIT", lambda t: [cit_tok.encode(apply_contract(s, cit_contract)) for s in t]),
     ]
 
     dcfg = DistortionCfg(sample_size=2000, seed=args.seed)
@@ -133,7 +134,7 @@ def main():
 
         # interface distortion (surrogate)
         if name == "CIT":
-            enc_pref = lambda s: tokenize_longest_match(apply_contract(s, cit_contract), cit_vocab)
+            enc_pref = lambda s: cit_tok.encode(apply_contract(s, cit_contract))
         else:
             base_tok = {"BPE": bpe, "WordPiece": wp, "Unigram": uni}[name]
             enc_pref = lambda s, _tok=base_tok: _tok.encode(s).ids

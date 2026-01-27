@@ -14,7 +14,9 @@ from __future__ import annotations
 from typing import Iterable, List, Sequence
 
 import numpy as np
-from sklearn.linear_model import LogisticRegression
+from sklearn.linear_model import SGDClassifier
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import log_loss
 
 
@@ -43,11 +45,21 @@ def estimate_ce(
     """Teacher-aligned cross-entropy proxy using a simple probe."""
     Xtr = featurize_token_ids(token_ids_train, vocab_size)
     Xva = featurize_token_ids(token_ids_val, vocab_size)
-    clf = LogisticRegression(
-        max_iter=200,
-        n_jobs=1,
-        random_state=seed,
-        multi_class="auto",
+    # LogisticRegression(lbfgs) can hit max_iter on some UCI-style datasets
+    # and becomes a major runtime bottleneck inside the induction loop.
+    # We use an SGD logistic regression with feature scaling for:
+    #   - stable convergence,
+    #   - speed,
+    #   - deterministic behavior via random_state.
+    clf = make_pipeline(
+        StandardScaler(with_mean=False),
+        SGDClassifier(
+            loss="log_loss",
+            alpha=1e-4,
+            max_iter=2000,
+            tol=1e-3,
+            random_state=seed,
+        ),
     )
     clf.fit(Xtr, y_train)
     p = clf.predict_proba(Xva)

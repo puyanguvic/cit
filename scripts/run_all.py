@@ -51,10 +51,11 @@ def main():
     if enabled("e1"):
         run("run_e1_synth.py", common + ["--outdir", f"{args.outroot}/e1_synth"])
 
-    # E2 (Adult + Credit-G)
+    # E2 (UCI tabular)
+    # Use per-dataset subfolders to avoid overwriting results.csv.
     if enabled("e2"):
-        run("run_e2_uci.py", common + ["--dataset", "adult", "--outdir", f"{args.outroot}/e2_uci"])
-        run("run_e2_uci.py", common + ["--dataset", "credit-g", "--outdir", f"{args.outroot}/e2_uci"])
+        run("run_e2_uci.py", common + ["--dataset", "adult", "--outdir", f"{args.outroot}/e2_uci/adult"])
+        run("run_e2_uci.py", common + ["--dataset", "credit-g", "--outdir", f"{args.outroot}/e2_uci/credit-g"])
 
     # E3
     if enabled("e3"):
