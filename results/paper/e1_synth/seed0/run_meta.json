@@ -1,9 +1,0 @@
-{
-  "experiment": "e1_synth",
-  "args": {
-    "outdir": "paper/e1_synth",
-    "vocab": 2048,
-    "device": "cuda",
-    "seed": 0
-  }
-}

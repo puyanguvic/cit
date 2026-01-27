@@ -22,7 +22,7 @@ from cit.data.serialize import SerializeCfg, serialize_df
 from cit.tokenizers.hf_baselines import train_bpe, train_wordpiece
 from cit.tokenizers.cit_contract import Contract, apply_contract
 from cit.tokenizers.cit_induction import train_cit, InductionCfg
-from cit.tokenizers.runtime import LongestMatchTokenizer
+from cit.tokenizers.runtime import tokenize_longest_match
 from cit.models.encoder import TinyEncoder
 from cit.models.train import train_compute_matched
 from cit.models.eval import evaluate
@@ -69,12 +69,23 @@ def measure_latency(model, sample_batch, device: str, iters: int = 50) -> float:
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--vocab", type=int, default=2048)
-    ap.add_argument("--max-len", type=int, default=256)
-    ap.add_argument("--total-tokens", type=int, default=2_000_000)
+    ap.add_argument("--max-len", type=int, default=512)
+    ap.add_argument(
+        "--total-tokens",
+        type=int,
+        default=5_000_000,
+        help="Training budget measured in *non-pad encoder tokens* (token-fair).",
+    )
+    ap.add_argument(
+        "--model-families",
+        type=str,
+        default="mini,small",
+        help="Comma-separated model families (mini,small,medium).",
+    )
     ap.add_argument(
         "--full-finetune",
         action="store_true",
-        help="Full fine-tuning of the encoder (much slower). Default is probe-only.",
+        help="Full fine-tuning of the encoder. Recommended for E3; probe-only on a random backbone collapses.",
     )
     ap.add_argument("--device", type=str, default="cuda")
     ap.add_argument("--out", type=str, default="e3_pareto.csv")
@@ -110,7 +121,6 @@ def main():
         InductionCfg(vocab_size=args.vocab, seed=args.seed),
         log_path=str(outdir / "tokenizers" / "cit" / "induction_log.jsonl"),
     )
-    cit_tok = LongestMatchTokenizer(cit_vocab)
 
     # save tokenizer artifacts
     tok_dir = outdir / "tokenizers"
@@ -125,14 +135,14 @@ def main():
     tokenizers = [
         ("BPE", lambda t: hf_encode(bpe, t)),
         ("WordPiece", lambda t: hf_encode(wp, t)),
-        ("CIT", lambda t: [cit_tok.encode(apply_contract(s, cit_contract)) for s in t]),
+        ("CIT", lambda t: [tokenize_longest_match(apply_contract(s, cit_contract), cit_vocab) for s in t]),
     ]
 
-    # model sizes
-    backbones = [
-        ("Small", dict(d_model=96, n_layers=2, n_heads=3)),
-        ("Base", dict(d_model=128, n_layers=4, n_heads=4)),
-    ]
+    # model families
+    from cit.models.family import parse_model_families, get_family_cfg
+
+    fams = parse_model_families(args.model_families)
+    backbones = [(name, get_family_cfg(name)) for name in fams]
 
     rows = []
     dcfg = DistortionCfg(sample_size=2000, seed=args.seed)
@@ -148,7 +158,7 @@ def main():
 
         # interface distortion (surrogate)
         if tok_name == "CIT":
-            enc_pref = lambda s: cit_tok.encode(apply_contract(s, cit_contract))
+            enc_pref = lambda s: tokenize_longest_match(apply_contract(s, cit_contract), cit_vocab)
         else:
             base_tok = {"BPE": bpe, "WordPiece": wp}[tok_name]
             enc_pref = lambda s, _tok=base_tok: _tok.encode(s).ids

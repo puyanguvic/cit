@@ -9,7 +9,7 @@ from cit.data.drift import make_variants
 from cit.tokenizers.hf_baselines import train_bpe, train_wordpiece, train_unigram
 from cit.tokenizers.cit_contract import Contract, apply_contract
 from cit.tokenizers.cit_induction import train_cit, InductionCfg
-from cit.tokenizers.runtime import LongestMatchTokenizer
+from cit.tokenizers.runtime import tokenize_longest_match
 from cit.models.encoder import TinyEncoder
 from cit.models.train import train_compute_matched
 from cit.models.eval import evaluate
@@ -55,7 +55,6 @@ def main():
         InductionCfg(vocab_size=args.vocab, lambda_dist=1.0, seed=args.seed),
         log_path=str(outdir / "tokenizers" / "cit" / "induction_log.jsonl"),
     )
-    cit_tok = LongestMatchTokenizer(cit_art)
 
     # save tokenizer artifacts
     tok_dir = outdir / "tokenizers"
@@ -78,7 +77,7 @@ def main():
         ("BPE", lambda t: hf_encode(bpe, t)),
         ("WordPiece", lambda t: hf_encode(wp, t)),
         ("Unigram", lambda t: hf_encode(uni, t)),
-        ("CIT", lambda t: [cit_tok.encode(apply_contract(s, cit_contract)) for s in t]),
+        ("CIT", lambda t: [tokenize_longest_match(apply_contract(s, cit_contract), cit_art) for s in t]),
     ]:
         tr_ids = enc(Xtr)
         te_ids = enc(Xte)
@@ -94,7 +93,7 @@ def main():
         rate = estimate_rate(te_ids)
         # distortion: use the same encoder function applied to *raw prefixes*
         if name == "CIT":
-            enc_pref = lambda s: cit_tok.encode(apply_contract(s, cit_contract))
+            enc_pref = lambda s: tokenize_longest_match(apply_contract(s, cit_contract), cit_art)
         else:
             # tokenizers.Tokenizer encodes full string; for prefixes we just encode prefix strings.
             base_tok = {"BPE": bpe, "WordPiece": wp, "Unigram": uni}[name]

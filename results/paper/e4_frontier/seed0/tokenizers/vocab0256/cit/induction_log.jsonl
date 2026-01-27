@@ -1,6 +1,0 @@
-{"step": -1, "vocab_size": 12, "base_rate": 221.8035, "base_dist": 0.2578678728824858}
-{"step": 50, "token": "ita", "vocab_size": 51, "rate": 188.607, "dist": 0.7086569605092419, "score": 120000.0, "mode": "fast"}
-{"step": 100, "token": "cat", "vocab_size": 101, "rate": 174.888, "dist": 0.7435712164810736, "score": 80000.0, "mode": "fast"}
-{"step": 150, "token": "ra", "vocab_size": 151, "rate": 156.808, "dist": 0.6237198733760342, "score": 31504.0, "mode": "fast"}
-{"step": 200, "token": "nt", "vocab_size": 201, "rate": 135.774, "dist": 0.35689073196248217, "score": 20274.0, "mode": "fast"}
-{"step": 250, "token": "nlwgt", "vocab_size": 251, "rate": 120.139, "dist": 0.8256971982937137, "score": 80000.0, "mode": "fast"}

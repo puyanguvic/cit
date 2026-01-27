@@ -47,6 +47,27 @@ python scripts/run_e4_frontier.py --vocabs 256,512,1024,2048,4096 --device cuda 
 
 This produces `runs/e4_frontier/seed0/results.csv` and `frontier.csv`, plus tokenizer artifacts under `tokenizers/vocabXXXX/`.
 
+### E5 (end-to-end): CSIC 2010 HTTP
+
+E5 trains the encoder end-to-end (no probe-only freezing) under a *token-fair* compute budget on a structured public HTTP dataset.
+To keep the repo self-contained, the script does not download datasets automatically.
+
+Place CSIC 2010 raw files under a directory such as `data/csic2010/`, e.g.:
+
+```text
+data/csic2010/
+  normalTraffic*.txt
+  anomalousTraffic*.txt
+```
+
+Then run:
+
+```bash
+python scripts/run_e5_csic_http.py --data-dir data/csic2010 --device cuda --seed 0
+```
+
+Outputs (tokenizers, logs, metrics) will be written under `results/paper/e5_csic_http/seed0/` by default.
+
 
 ## Plotting (frontier curves)
 

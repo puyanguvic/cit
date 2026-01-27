@@ -25,7 +25,7 @@ from cit.data.serialize import SerializeCfg, serialize_df
 from cit.tokenizers.hf_baselines import train_bpe, train_wordpiece
 from cit.tokenizers.cit_contract import Contract, apply_contract
 from cit.tokenizers.cit_induction import train_cit, InductionCfg
-from cit.tokenizers.runtime import LongestMatchTokenizer
+from cit.tokenizers.runtime import tokenize_longest_match
 from cit.models.encoder import TinyEncoder
 from cit.models.train import train_compute_matched
 from cit.models.eval import evaluate
@@ -146,11 +146,10 @@ def main():
         save_vocab_json(cit_vocab, tok_root / "cit" / "vocab.json")
         save_json(cit_contract, tok_root / "cit" / "contract.json")
 
-            cit_tok = LongestMatchTokenizer(cit_vocab)
-            tokenizers = [
+        tokenizers = [
             ("BPE", lambda t, _tok=bpe: hf_encode(_tok, t)),
             ("WordPiece", lambda t, _tok=wp: hf_encode(_tok, t)),
-                ("CIT", lambda t, _tok=cit_tok, _c=cit_contract: [_tok.encode(apply_contract(s, _c)) for s in t]),
+            ("CIT", lambda t, _v=cit_vocab, _c=cit_contract: [tokenize_longest_match(apply_contract(s, _c), _v) for s in t]),
         ]
 
         for tok_name, enc in tokenizers:
@@ -168,7 +167,7 @@ def main():
 
             # interface distortion (surrogate)
             if tok_name == "CIT":
-                enc_pref = lambda s, _tok=cit_tok, _c=cit_contract: _tok.encode(apply_contract(s, _c))
+                enc_pref = lambda s, _v=cit_vocab, _c=cit_contract: tokenize_longest_match(apply_contract(s, _c), _v)
             else:
                 base_tok = {"BPE": bpe, "WordPiece": wp}[tok_name]
                 enc_pref = lambda s, _tok=base_tok: _tok.encode(s).ids
@@ -232,15 +231,14 @@ def main():
         w.writerows(frontier)
     save_json({"frontier": frontier}, outdir / "frontier.json")
 
-    # Optional: auto-plot for paper figures
-    if args.plot:
-        import subprocess
-        import sys
 
-        script = Path(__file__).parent / "plot_frontier.py"
-        subprocess.check_call([sys.executable, str(script), "--run_dir", str(outdir)])
-        print("\nSaved:", out_csv)
-        print("Saved:", out_f)
+# Optional: auto-plot for paper figures
+if args.plot:
+    import subprocess, sys
+    script = Path(__file__).parent / "plot_frontier.py"
+    subprocess.check_call([sys.executable, str(script), "--run_dir", str(outdir)])
+    print("\nSaved:", out_csv)
+    print("Saved:", out_f)
 
 
 if __name__ == "__main__":

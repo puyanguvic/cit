@@ -37,7 +37,7 @@ def main():
         "--only",
         type=str,
         default="",
-        help="Comma-separated subset of experiments to run: e1,e2,e3,e4 (default: run all)",
+        help="Comma-separated subset of experiments to run: e1,e2,e3,e4,e5 (default: run all)",
     )
     args = ap.parse_args()
 
@@ -51,15 +51,28 @@ def main():
     if enabled("e1"):
         run("run_e1_synth.py", common + ["--outdir", f"{args.outroot}/e1_synth"])
 
-    # E2 (UCI tabular)
-    # Use per-dataset subfolders to avoid overwriting results.csv.
+    # E2 (Adult + Credit-G)
     if enabled("e2"):
-        run("run_e2_uci.py", common + ["--dataset", "adult", "--outdir", f"{args.outroot}/e2_uci/adult"])
-        run("run_e2_uci.py", common + ["--dataset", "credit-g", "--outdir", f"{args.outroot}/e2_uci/credit-g"])
+        run("run_e2_uci.py", common + ["--dataset", "adult", "--outdir", f"{args.outroot}/e2_uci"])
+        run("run_e2_uci.py", common + ["--dataset", "credit-g", "--outdir", f"{args.outroot}/e2_uci"])
 
     # E3
     if enabled("e3"):
-        run("run_e3_pareto_prefix.py", common + ["--outdir", f"{args.outroot}/e3_pareto"])
+        run(
+            "run_e3_pareto_prefix.py",
+            common
+            + [
+                "--outdir",
+                f"{args.outroot}/e3_pareto",
+                "--full-finetune",
+                "--max-len",
+                "512",
+                "--model-families",
+                "mini,small",
+                "--total-tokens",
+                "5000000",
+            ],
+        )
 
     # E4 + plots
     if enabled("e4"):
@@ -67,6 +80,23 @@ def main():
         if args.plot:
             e4_args.append("--plot")
         run("run_e4_frontier.py", e4_args)
+
+    # E5 (end-to-end on public phishing-email dataset; auto-download via HF datasets)
+    if enabled("e5"):
+        run(
+            "run_e5_end2end_phish.py",
+            common
+            + [
+                "--outdir",
+                f"{args.outroot}/e5_end2end_phish",
+                "--max_len",
+                "512",
+                "--model_families",
+                "mini",
+                "--total_tokens",
+                "5000000",
+            ],
+        )
 
     print("\n[OK] All requested experiments finished.")
     print(f"Results root: results/{args.outroot}/seed{args.seed} (and per-experiment subfolders)")
