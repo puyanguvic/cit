@@ -1,0 +1,23 @@
+{
+  "experiment": "e4_frontier",
+  "args": {
+    "vocabs": [
+      256,
+      512,
+      1024,
+      2048,
+      4096
+    ],
+    "max_len": 256,
+    "total_tokens": 2000000,
+    "full_finetune": false,
+    "device": "cuda",
+    "outdir": "paper/e4_frontier",
+    "seed": 0,
+    "plot": true,
+    "d_model": 128,
+    "n_layers": 4,
+    "n_heads": 4,
+    "dist_samples": 2000
+  }
+}
