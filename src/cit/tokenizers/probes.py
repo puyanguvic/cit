@@ -12,10 +12,12 @@ to better match the paper's prefix formulation.
 from __future__ import annotations
 
 from typing import Iterable, List, Sequence
+import warnings
 
 import numpy as np
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import log_loss
+from sklearn.exceptions import ConvergenceWarning
 
 
 def _truncate(ids: Sequence[int], k: int | None) -> Sequence[int]:
@@ -47,7 +49,9 @@ def estimate_ce(
         max_iter=200,
         random_state=seed,
     )
-    clf.fit(Xtr, y_train)
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", category=ConvergenceWarning)
+        clf.fit(Xtr, y_train)
     p = clf.predict_proba(Xva)
     return float(log_loss(y_val, p))
 

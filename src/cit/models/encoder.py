@@ -28,7 +28,11 @@ class TinyEncoder(nn.Module):
             batch_first=True,
             activation="gelu",
         )
-        self.encoder = nn.TransformerEncoder(enc_layer, num_layers=n_layers)
+        self.encoder = nn.TransformerEncoder(
+            enc_layer,
+            num_layers=n_layers,
+            enable_nested_tensor=False,
+        )
         self.norm = nn.LayerNorm(d_model)
         self.cls = nn.Linear(d_model, n_classes)
 

@@ -11,3 +11,4 @@ Requires-Dist: tokenizers
 Requires-Dist: transformers
 Requires-Dist: datasets
 Requires-Dist: matplotlib
+Requires-Dist: openml

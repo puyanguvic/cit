@@ -1,0 +1,3 @@
+{"step": -1, "vocab_size": 12, "base_rate": 221.8035, "base_dist": 0.25837176629572817}
+{"step": 12, "token": "a", "vocab_size": 13, "rate": 221.73, "dist": 0.2408207609027276, "gain_proxy": 429294.0175510054}
+{"step": 13, "token": "United-States", "vocab_size": 14, "rate": 211.056, "dist": 0.16604667073327503, "gain_proxy": 214752.07477409017}

@@ -1,4 +1,4 @@
-"""Tokenizer/interface metrics used by the paper.
+r"""Tokenizer/interface metrics used by the paper.
 
 This module intentionally keeps the *interface* measurements lightweight and
 deterministic, so they can be run during vocabulary induction and reported in
@@ -19,11 +19,13 @@ token-prefix budget).
 from __future__ import annotations
 
 from dataclasses import dataclass
+import warnings
 from typing import Callable, Iterable, List, Sequence, Tuple
 
 import numpy as np
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.linear_model import LogisticRegression
+from sklearn.exceptions import ConvergenceWarning
 
 
 def estimate_rate(token_ids: Sequence[Sequence[int]]) -> float:
@@ -106,7 +108,9 @@ def estimate_surrogate_distortion(
             max_iter=200,
             random_state=int(cfg.seed),
         )
-        teacher.fit(Xtr, y_tr)
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=ConvergenceWarning)
+            teacher.fit(Xtr, y_tr)
         p_teacher = teacher.predict_proba(Xva)
 
         # student on tokenized prefixes, evaluated under token-prefix budgets
@@ -130,7 +134,9 @@ def estimate_surrogate_distortion(
             max_iter=200,
             random_state=int(cfg.seed) + 13,
         )
-        student.fit(Xtr_s, y_tr)
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=ConvergenceWarning)
+            student.fit(Xtr_s, y_tr)
 
         # Evaluate KL under token-prefix budgets by recomputing features with truncation.
         for k in cfg.token_prefix_ks:
