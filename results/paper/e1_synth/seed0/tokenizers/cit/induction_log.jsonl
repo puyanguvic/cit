@@ -1,0 +1,2 @@
+{"step": -1, "vocab_size": 10, "base_rate": 117.512, "base_dist": 0.9867185784855973}
+{"step": 10, "token": "<ID_LONG", "vocab_size": 11, "rate": 117.499, "dist": 0.9650755900406436, "gain_proxy": 665000.0216429884}

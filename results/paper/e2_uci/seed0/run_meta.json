@@ -1,0 +1,13 @@
+{
+  "experiment": "e2_uci",
+  "args": {
+    "dataset": "adult",
+    "vocab": 2048,
+    "max_len": 256,
+    "total_tokens": 2000000,
+    "device": "cuda",
+    "seed": 0,
+    "outdir": "paper/e2_uci",
+    "out": ""
+  }
+}
