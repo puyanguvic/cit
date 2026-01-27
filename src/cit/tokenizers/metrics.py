@@ -104,9 +104,7 @@ def estimate_surrogate_distortion(
         Xva = vec.transform(va_pref)
         teacher = LogisticRegression(
             max_iter=200,
-            n_jobs=1,
             random_state=int(cfg.seed),
-            multi_class="auto",
         )
         teacher.fit(Xtr, y_tr)
         p_teacher = teacher.predict_proba(Xva)
@@ -130,9 +128,7 @@ def estimate_surrogate_distortion(
 
         student = LogisticRegression(
             max_iter=200,
-            n_jobs=1,
             random_state=int(cfg.seed) + 13,
-            multi_class="auto",
         )
         student.fit(Xtr_s, y_tr)
 

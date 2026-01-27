@@ -45,9 +45,7 @@ def estimate_ce(
     Xva = featurize_token_ids(token_ids_val, vocab_size)
     clf = LogisticRegression(
         max_iter=200,
-        n_jobs=1,
         random_state=seed,
-        multi_class="auto",
     )
     clf.fit(Xtr, y_train)
     p = clf.predict_proba(Xva)
