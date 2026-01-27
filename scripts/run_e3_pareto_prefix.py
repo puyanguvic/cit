@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import csv
 import time
+from pathlib import Path
 
 import torch
 
@@ -25,6 +26,8 @@ from cit.tokenizers.runtime import tokenize_longest_match
 from cit.models.encoder import TinyEncoder
 from cit.models.train import train_compute_matched
 from cit.models.eval import evaluate
+from cit.utils.artifacts import save_json, save_vocab_json, save_run_metadata
+from cit.tokenizers.metrics import DistortionCfg, estimate_surrogate_distortion, estimate_rate
 
 
 def hf_encode(tok, texts):
@@ -70,10 +73,15 @@ def main():
     ap.add_argument("--total-tokens", type=int, default=2_000_000)
     ap.add_argument("--device", type=str, default="cuda")
     ap.add_argument("--out", type=str, default="e3_pareto.csv")
+    ap.add_argument("--outdir", type=str, default="runs/e3_pareto")
     ap.add_argument("--seed", type=int, default=0)
     args = ap.parse_args()
 
     set_seed(args.seed)
+
+    outdir = Path(args.outdir) / f"seed{args.seed}"
+    outdir.mkdir(parents=True, exist_ok=True)
+    save_run_metadata(outdir, exp_name="e3_pareto", args=vars(args))
     ds = load_adult(args.seed)
     n_classes = len(set(ds.y_train))
 
@@ -86,7 +94,23 @@ def main():
     wp = train_wordpiece(Xtr, vocab_size=args.vocab)
 
     contract = Contract()
-    cit_vocab, cit_contract = train_cit(Xtr, ds.y_train.tolist(), contract, InductionCfg(vocab_size=args.vocab, seed=args.seed))
+    cit_vocab, cit_contract = train_cit(
+        Xtr,
+        ds.y_train.tolist(),
+        contract,
+        InductionCfg(vocab_size=args.vocab, seed=args.seed),
+        log_path=str(outdir / "tokenizers" / "cit" / "induction_log.jsonl"),
+    )
+
+    # save tokenizer artifacts
+    tok_dir = outdir / "tokenizers"
+    (tok_dir / "bpe").mkdir(parents=True, exist_ok=True)
+    (tok_dir / "wordpiece").mkdir(parents=True, exist_ok=True)
+    (tok_dir / "cit").mkdir(parents=True, exist_ok=True)
+    bpe.save(str(tok_dir / "bpe" / "tokenizer.json"))
+    wp.save(str(tok_dir / "wordpiece" / "tokenizer.json"))
+    save_vocab_json(cit_vocab, tok_dir / "cit" / "vocab.json")
+    save_json(cit_contract, tok_dir / "cit" / "contract.json")
 
     tokenizers = [
         ("BPE", lambda t: hf_encode(bpe, t)),
@@ -101,6 +125,7 @@ def main():
     ]
 
     rows = []
+    dcfg = DistortionCfg(sample_size=2000, seed=args.seed)
     for tok_name, enc in tokenizers:
         tr_ids = enc(Xtr)
         te_ids = enc(Xte)
@@ -110,6 +135,14 @@ def main():
 
         avg_len = sum(len(s) for s in te_ids) / len(te_ids)
         p95 = sorted([len(s) for s in te_ids])[int(0.95 * len(te_ids))]
+
+        # interface distortion (surrogate)
+        if tok_name == "CIT":
+            enc_pref = lambda s: tokenize_longest_match(apply_contract(s, cit_contract), cit_vocab)
+        else:
+            base_tok = {"BPE": bpe, "WordPiece": wp}[tok_name]
+            enc_pref = lambda s, _tok=base_tok: _tok.encode(s).ids
+        dist = estimate_surrogate_distortion(Xtr, ds.y_train.tolist(), encode_prefix=enc_pref, vocab_size=args.vocab, cfg=dcfg)
 
         for bb_name, bb_cfg in backbones:
             model = TinyEncoder(vocab_size=args.vocab, n_classes=n_classes, max_len=args.max_len, **bb_cfg)
@@ -135,15 +168,24 @@ def main():
                     "acc": acc,
                     "avg_len": avg_len,
                     "p95_len": p95,
+                    "distortion_hat": float(dist),
                     "p95_latency_ms": p95_ms,
                 }
             )
             print(tok_name, bb_name, "acc", acc, "p95_ms", p95_ms)
 
-    with open(args.out, "w", newline="") as f:
+    out_csv = Path(args.out)
+    with out_csv.open("w", newline="") as f:
         w = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
         w.writeheader()
         w.writerows(rows)
+
+    # canonical copy inside outdir
+    with (outdir / "results.csv").open("w", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
+        w.writeheader()
+        w.writerows(rows)
+    save_json({"rows": rows}, outdir / "results.json")
 
 
 if __name__ == "__main__":

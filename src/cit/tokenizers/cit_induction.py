@@ -8,6 +8,7 @@ from tqdm import tqdm
 
 from .cit_contract import Contract, apply_contract, extract_contract_markers
 from .runtime import tokenize_longest_match
+from .metrics import DistortionCfg, estimate_surrogate_distortion, estimate_rate
 
 
 @dataclass
@@ -95,43 +96,47 @@ def _estimate_distortion(
     prefix_ks: Tuple[int, ...],
     seed: int,
 ) -> float:
-    """Lightweight prefix-aligned interface distortion proxy.
+    """Deployment-aligned surrogate distortion proxy.
 
-    We approximate directed semantic distortion using a cheap probe that predicts
-    labels from *tokenized prefixes*. Concretely, we average probe cross-entropy
-    over a small set of token-prefix budgets (prefix_ks).
-
-    Note: this is an interface diagnostic, not a deployed model.
+    This implements the paper's relaxation idea: compare a capacity-limited
+    "teacher" seeing raw prefixes with a capacity-limited "student" restricted
+    to tokenized prefixes, and average a discrepancy over prefix lengths.
     """
-    from .probes import estimate_prefix_ce
 
-    rng = np.random.default_rng(seed)
-    n = len(texts)
-    m = min(sample_size, n)
-    idx = rng.choice(n, size=m, replace=False)
-
-    token_ids = [tokenize_longest_match(texts[int(i)], vocab) for i in idx]
-    y = labels[idx].tolist()
-
-    # simple deterministic split
-    split = int(0.8 * len(token_ids))
-    tr_ids, va_ids = token_ids[:split], token_ids[split:]
-    y_tr, y_va = y[:split], y[split:]
-    if len(va_ids) == 0:
-        va_ids, y_va = tr_ids, y_tr
-
-    return estimate_prefix_ce(
-        tr_ids,
-        y_tr,
-        va_ids,
-        y_va,
-        vocab_size=max(vocab.values()) + 1,
-        prefix_ks=prefix_ks,
+    dcfg = DistortionCfg(
+        token_prefix_ks=prefix_ks,
+        sample_size=sample_size,
         seed=seed,
+    )
+    vocab_size = max(vocab.values()) + 1
+    return estimate_surrogate_distortion(
+        texts,
+        labels.tolist() if isinstance(labels, np.ndarray) else labels,
+        encode_prefix=lambda s: tokenize_longest_match(s, vocab),
+        vocab_size=vocab_size,
+        cfg=dcfg,
     )
 
 
-def train_cit(raw_texts: List[str], labels: List[int], contract: Contract, cfg: InductionCfg) -> Tuple[Dict[str, int], Contract]:
+def _estimate_rate(texts: List[str], vocab: Dict[str, int], sample_size: int, seed: int) -> float:
+    rng = np.random.default_rng(seed)
+    n = len(texts)
+    if n == 0:
+        return 0.0
+    m = min(sample_size, n)
+    idx = rng.choice(n, size=m, replace=False)
+    token_ids = [tokenize_longest_match(texts[int(i)], vocab) for i in idx]
+    return estimate_rate(token_ids)
+
+
+def train_cit(
+    raw_texts: List[str],
+    labels: List[int],
+    contract: Contract,
+    cfg: InductionCfg,
+    *,
+    log_path: str | None = None,
+) -> Tuple[Dict[str, int], Contract]:
     """Train CIT vocabulary with greedy gain--distortion selection.
 
     This is a compact reference implementation suitable for experiments.
@@ -147,6 +152,28 @@ def train_cit(raw_texts: List[str], labels: List[int], contract: Contract, cfg: 
 
     # current distortion estimate
     base_dist = _estimate_distortion(texts, y, vocab, cfg.score_sample_size, cfg.prefix_ks, cfg.seed)
+    base_rate = _estimate_rate(texts, vocab, max(1024, cfg.score_sample_size // 2), cfg.seed)
+
+    # optional log
+    log_f = None
+    if log_path:
+        import json
+        from pathlib import Path
+
+        p = Path(log_path)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        log_f = p.open("w", encoding="utf-8")
+        log_f.write(
+            json.dumps(
+                {
+                    "step": -1,
+                    "vocab_size": len(vocab),
+                    "base_rate": base_rate,
+                    "base_dist": base_dist,
+                }
+            )
+            + "\n"
+        )
 
     # greedily grow
     remaining = sorted(candidates.items(), key=lambda kv: kv[1], reverse=True)
@@ -177,19 +204,41 @@ def train_cit(raw_texts: List[str], labels: List[int], contract: Contract, cfg: 
                 cfg.prefix_ks,
                 int(rng.integers(1e9)),
             )
+            rate = _estimate_rate(texts, tmp_vocab, max(512, cfg.score_sample_size // 4), int(rng.integers(1e9)))
             delta = dist - base_dist
+            # lower is better for rate/distortion; we use gain as a cheap proxy to speed.
             score = gain - cfg.lambda_dist * delta
             if score > best_score:
                 best_score = score
                 best = tok
                 best_dist = dist
+                best_rate = rate
 
         if best is None:
             continue
 
         vocab[best] = len(vocab)
         base_dist = float(best_dist)
+        base_rate = float(best_rate)
+        if log_f:
+            import json
+
+            log_f.write(
+                json.dumps(
+                    {
+                        "step": len(vocab) - 1,
+                        "token": best,
+                        "vocab_size": len(vocab),
+                        "rate": base_rate,
+                        "dist": base_dist,
+                        "gain_proxy": float(best_score),
+                    }
+                )
+                + "\n"
+            )
         pbar.update(1)
 
     pbar.close()
+    if log_f:
+        log_f.close()
     return vocab, contract

@@ -14,6 +14,9 @@ import argparse
 import csv
 from pathlib import Path
 
+from cit.utils.artifacts import save_json, save_vocab_json, save_run_metadata
+from cit.tokenizers.metrics import DistortionCfg, estimate_surrogate_distortion, estimate_rate
+
 from cit.utils.seed import set_seed
 from cit.data.uci import load_adult, load_german_credit
 from cit.data.serialize import SerializeCfg, serialize_df
@@ -38,10 +41,15 @@ def main():
     ap.add_argument("--total-tokens", type=int, default=2_000_000)
     ap.add_argument("--device", type=str, default="cuda")
     ap.add_argument("--seed", type=int, default=0)
-    ap.add_argument("--out", type=str, default="", help="Optional CSV output path")
+    ap.add_argument("--outdir", type=str, default="runs/e2_uci")
+    ap.add_argument("--out", type=str, default="", help="Optional CSV output path (legacy)")
     args = ap.parse_args()
 
     set_seed(args.seed)
+
+    outdir = Path(args.outdir) / f"{args.dataset}" / f"seed{args.seed}"
+    outdir.mkdir(parents=True, exist_ok=True)
+    save_run_metadata(outdir, exp_name="e2_uci", args=vars(args))
 
     ds = load_adult(args.seed) if args.dataset == "adult" else load_german_credit(args.seed)
     n_classes = len(set(ds.y_train))
@@ -59,7 +67,25 @@ def main():
     wp = train_wordpiece(Xtr, vocab_size=args.vocab)
     uni = train_unigram(Xtr, vocab_size=args.vocab)
 
-    cit_vocab, cit_contract = train_cit(Xtr, ds.y_train.tolist(), contract, InductionCfg(vocab_size=args.vocab, seed=args.seed))
+    cit_vocab, cit_contract = train_cit(
+        Xtr,
+        ds.y_train.tolist(),
+        contract,
+        InductionCfg(vocab_size=args.vocab, seed=args.seed),
+        log_path=str(outdir / "tokenizers" / "cit" / "induction_log.jsonl"),
+    )
+
+    # save tokenizer artifacts
+    tok_dir = outdir / "tokenizers"
+    (tok_dir / "bpe").mkdir(parents=True, exist_ok=True)
+    (tok_dir / "wordpiece").mkdir(parents=True, exist_ok=True)
+    (tok_dir / "unigram").mkdir(parents=True, exist_ok=True)
+    (tok_dir / "cit").mkdir(parents=True, exist_ok=True)
+    bpe.save(str(tok_dir / "bpe" / "tokenizer.json"))
+    wp.save(str(tok_dir / "wordpiece" / "tokenizer.json"))
+    uni.save(str(tok_dir / "unigram" / "tokenizer.json"))
+    save_vocab_json(cit_vocab, tok_dir / "cit" / "vocab.json")
+    save_json(cit_contract, tok_dir / "cit" / "contract.json")
 
     encoders = [
         ("BPE", lambda t: hf_encode(bpe, t)),
@@ -67,6 +93,8 @@ def main():
         ("Unigram", lambda t: hf_encode(uni, t)),
         ("CIT", lambda t: [tokenize_longest_match(apply_contract(s, cit_contract), cit_vocab) for s in t]),
     ]
+
+    dcfg = DistortionCfg(sample_size=2000, seed=args.seed)
 
     rows = []
     for name, enc in encoders:
@@ -80,14 +108,23 @@ def main():
         model = train_compute_matched(model, train_pairs, pad_id, args.max_len, args.total_tokens, device=args.device)
         acc = evaluate(model, test_pairs, pad_id, args.max_len, device=args.device)
 
-        avg_len = sum(len(s) for s in te_ids) / len(te_ids)
+        avg_len = estimate_rate(te_ids)
         p95 = sorted([len(s) for s in te_ids])[int(0.95 * len(te_ids))]
+
+        # interface distortion (surrogate)
+        if name == "CIT":
+            enc_pref = lambda s: tokenize_longest_match(apply_contract(s, cit_contract), cit_vocab)
+        else:
+            base_tok = {"BPE": bpe, "WordPiece": wp, "Unigram": uni}[name]
+            enc_pref = lambda s, _tok=base_tok: _tok.encode(s).ids
+        dist = estimate_surrogate_distortion(Xtr, ds.y_train.tolist(), encode_prefix=enc_pref, vocab_size=args.vocab, cfg=dcfg)
         row = {
             "dataset": args.dataset,
             "tokenizer": name,
             "acc": acc,
             "avg_len": avg_len,
             "p95_len": p95,
+            "distortion_hat": float(dist),
             "vocab": args.vocab,
             "max_len": args.max_len,
             "total_tokens": args.total_tokens,
@@ -104,6 +141,14 @@ def main():
             w.writeheader()
             w.writerows(rows)
         print(f"[wrote] {outp}")
+
+    # always write a canonical results file
+    with (outdir / "results.csv").open("w", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
+        w.writeheader()
+        w.writerows(rows)
+    save_json({"rows": rows}, outdir / "results.json")
+    print(f"[wrote] {outdir / 'results.csv'}")
 
 
 if __name__ == "__main__":
