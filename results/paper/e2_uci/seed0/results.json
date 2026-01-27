@@ -1,0 +1,52 @@
+{
+  "rows": [
+    {
+      "dataset": "credit-g",
+      "tokenizer": "BPE",
+      "acc": 0.7,
+      "avg_len": 141.755,
+      "p95_len": 151,
+      "distortion_hat": 0.09691014077266852,
+      "vocab": 2048,
+      "max_len": 256,
+      "total_tokens": 2000000,
+      "seed": 0
+    },
+    {
+      "dataset": "credit-g",
+      "tokenizer": "WordPiece",
+      "acc": 0.7,
+      "avg_len": 141.69,
+      "p95_len": 150,
+      "distortion_hat": 0.1011621513234776,
+      "vocab": 2048,
+      "max_len": 256,
+      "total_tokens": 2000000,
+      "seed": 0
+    },
+    {
+      "dataset": "credit-g",
+      "tokenizer": "Unigram",
+      "acc": 0.7,
+      "avg_len": 321.39,
+      "p95_len": 339,
+      "distortion_hat": 0.365913336457881,
+      "vocab": 2048,
+      "max_len": 256,
+      "total_tokens": 2000000,
+      "seed": 0
+    },
+    {
+      "dataset": "credit-g",
+      "tokenizer": "CIT",
+      "acc": 0.7,
+      "avg_len": 99.09,
+      "p95_len": 113,
+      "distortion_hat": 0.07881655954092326,
+      "vocab": 2048,
+      "max_len": 256,
+      "total_tokens": 2000000,
+      "seed": 0
+    }
+  ]
+}

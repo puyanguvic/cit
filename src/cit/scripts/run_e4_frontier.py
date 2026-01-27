@@ -231,14 +231,15 @@ def main():
         w.writerows(frontier)
     save_json({"frontier": frontier}, outdir / "frontier.json")
 
+    # Optional: auto-plot for paper figures
+    if args.plot:
+        import subprocess
+        import sys
 
-# Optional: auto-plot for paper figures
-if args.plot:
-    import subprocess, sys
-    script = Path(__file__).parent / "plot_frontier.py"
-    subprocess.check_call([sys.executable, str(script), "--run_dir", str(outdir)])
-    print("\nSaved:", out_csv)
-    print("Saved:", out_f)
+        script = Path(__file__).parent / "plot_frontier.py"
+        subprocess.check_call([sys.executable, str(script), "--run_dir", str(outdir)])
+        print("\nSaved:", out_csv)
+        print("Saved:", out_f)
 
 
 if __name__ == "__main__":

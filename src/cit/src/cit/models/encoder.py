@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 import torch
 import torch.nn as nn
 
@@ -28,7 +29,10 @@ class TinyEncoder(nn.Module):
             batch_first=True,
             activation="gelu",
         )
-        self.encoder = nn.TransformerEncoder(enc_layer, num_layers=n_layers)
+        enc_kwargs = {}
+        if "enable_nested_tensor" in inspect.signature(nn.TransformerEncoder).parameters:
+            enc_kwargs["enable_nested_tensor"] = False
+        self.encoder = nn.TransformerEncoder(enc_layer, num_layers=n_layers, **enc_kwargs)
         self.norm = nn.LayerNorm(d_model)
         self.cls = nn.Linear(d_model, n_classes)
 
