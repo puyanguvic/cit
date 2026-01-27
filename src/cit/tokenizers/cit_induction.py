@@ -22,6 +22,14 @@ class InductionCfg:
     # Prefix budgets used by the distortion probe (token-prefix lengths)
     prefix_ks: Tuple[int, ...] = (16, 32, 64, 128)
     lambda_dist: float = 1.0
+    # Induction mode: 'full' = distortion-aware greedy (slow), 'fast' = gain-only fill (recommended)
+    mode: str = "fast"
+    # In 'full' mode: evaluate distortion for only top-K gain candidates per step.
+    topk_dist: int = 8
+    # In 'full' mode: how many candidates to consider per step (sampled from remaining).
+    candidate_batch: int = 256
+    # In both modes: log metrics every N additions (0 disables).
+    log_every: int = 50
     seed: int = 0
 
 
@@ -175,70 +183,113 @@ def train_cit(
             + "\n"
         )
 
+    
     # greedily grow
     remaining = sorted(candidates.items(), key=lambda kv: kv[1], reverse=True)
 
-    pbar = tqdm(total=cfg.vocab_size - len(vocab), desc="train_cit", leave=False)
-    while len(vocab) < cfg.vocab_size and remaining:
-        # sample a small batch of candidates to score (speed)
-        batch = remaining[: 512]
-        remaining = remaining[512:]
+    # Helper: write periodic log snapshot (cheap)
+    def _maybe_log(step_token: str | None = None, score: float | None = None):
+        nonlocal base_rate, base_dist
+        if not log_f or cfg.log_every <= 0:
+            return
+        # log every N additions
+        if (len(vocab) - 1) % cfg.log_every != 0:
+            return
+        import json
 
-        best = None
-        best_score = -1e9
-        best_dist = None
+        log_f.write(
+            json.dumps(
+                {
+                    "step": len(vocab) - 1,
+                    "token": step_token,
+                    "vocab_size": len(vocab),
+                    "rate": float(base_rate),
+                    "dist": float(base_dist),
+                    "score": float(score) if score is not None else None,
+                    "mode": cfg.mode,
+                }
+            )
+            + "\n"
 
-        for tok, freq in batch:
+        )
+
+    # Fast mode: fill by gain proxy only (recommended for large corpora).
+    # This keeps induction deterministic and scalable, while distortion is still
+    # reported (and can be used) at evaluation time.
+    if cfg.mode.lower() == "fast":
+        pbar = tqdm(total=cfg.vocab_size - len(vocab), desc="train_cit", leave=False)
+        for tok, freq in remaining:
+            if len(vocab) >= cfg.vocab_size:
+                break
             if tok in vocab:
                 continue
-            # gain proxy: freq weighted by length saved
             gain = freq * max(1, len(tok) - 1)
-            # estimate new distortion on-the-fly using a small sample
-            tmp_vocab = vocab.copy()
-            tmp_vocab[tok] = len(tmp_vocab)
-            dist = _estimate_distortion(
-                texts,
-                y,
-                tmp_vocab,
-                max(512, cfg.score_sample_size // 4),
-                cfg.prefix_ks,
-                int(rng.integers(1e9)),
-            )
-            rate = _estimate_rate(texts, tmp_vocab, max(512, cfg.score_sample_size // 4), int(rng.integers(1e9)))
-            delta = dist - base_dist
-            # lower is better for rate/distortion; we use gain as a cheap proxy to speed.
-            score = gain - cfg.lambda_dist * delta
-            if score > best_score:
-                best_score = score
-                best = tok
-                best_dist = dist
-                best_rate = rate
-
-        if best is None:
-            continue
-
-        vocab[best] = len(vocab)
-        base_dist = float(best_dist)
-        base_rate = float(best_rate)
-        if log_f:
-            import json
-
-            log_f.write(
-                json.dumps(
-                    {
-                        "step": len(vocab) - 1,
-                        "token": best,
-                        "vocab_size": len(vocab),
-                        "rate": base_rate,
-                        "dist": base_dist,
-                        "gain_proxy": float(best_score),
-                    }
+            vocab[tok] = len(vocab)
+            # update cheap rate/dist estimates occasionally (for logging only)
+            if cfg.log_every > 0 and (len(vocab) - 1) % cfg.log_every == 0:
+                base_rate = _estimate_rate(texts, vocab, max(512, cfg.score_sample_size // 4), int(rng.integers(1e9)))
+                base_dist = _estimate_distortion(
+                    texts, y, vocab, max(512, cfg.score_sample_size // 8), cfg.prefix_ks, int(rng.integers(1e9))
                 )
-                + "\n"
-            )
-        pbar.update(1)
+                _maybe_log(step_token=tok, score=float(gain))
+            pbar.update(1)
+        pbar.close()
+    else:
+        # Full mode: distortion-aware greedy selection, but amortized:
+        #  - consider only cfg.candidate_batch candidates per step
+        #  - compute distortion for only top cfg.topk_dist candidates by gain
+        pbar = tqdm(total=cfg.vocab_size - len(vocab), desc="train_cit", leave=False)
+        while len(vocab) < cfg.vocab_size and remaining:
+            batch = remaining[: cfg.candidate_batch]
+            remaining = remaining[cfg.candidate_batch :]
 
-    pbar.close()
+            # rank by cheap gain proxy
+            scored = []
+            for tok, freq in batch:
+                if tok in vocab:
+                    continue
+                gain = freq * max(1, len(tok) - 1)
+                scored.append((gain, tok, freq))
+            if not scored:
+                continue
+            scored.sort(reverse=True, key=lambda x: x[0])
+            shortlist = scored[: max(1, cfg.topk_dist)]
+
+            best_tok = None
+            best_score = -1e18
+            best_dist = None
+            best_rate = None
+
+            for gain, tok, _freq in shortlist:
+                tmp_vocab = vocab.copy()
+                tmp_vocab[tok] = len(tmp_vocab)
+                dist = _estimate_distortion(
+                    texts,
+                    y,
+                    tmp_vocab,
+                    max(512, cfg.score_sample_size // 8),
+                    cfg.prefix_ks,
+                    int(rng.integers(1e9)),
+                )
+                rate = _estimate_rate(texts, tmp_vocab, max(512, cfg.score_sample_size // 8), int(rng.integers(1e9)))
+                delta = dist - base_dist
+                score = gain - cfg.lambda_dist * delta
+                if score > best_score:
+                    best_score = score
+                    best_tok = tok
+                    best_dist = dist
+                    best_rate = rate
+
+            if best_tok is None:
+                continue
+
+            vocab[best_tok] = len(vocab)
+            base_dist = float(best_dist)
+            base_rate = float(best_rate)
+            _maybe_log(step_token=best_tok, score=float(best_score))
+            pbar.update(1)
+
+        pbar.close()
     if log_f:
         log_f.close()
     return vocab, contract

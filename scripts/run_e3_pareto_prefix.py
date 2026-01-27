@@ -71,6 +71,11 @@ def main():
     ap.add_argument("--vocab", type=int, default=2048)
     ap.add_argument("--max-len", type=int, default=256)
     ap.add_argument("--total-tokens", type=int, default=2_000_000)
+    ap.add_argument(
+        "--full-finetune",
+        action="store_true",
+        help="Full fine-tuning of the encoder (much slower). Default is probe-only.",
+    )
     ap.add_argument("--device", type=str, default="cuda")
     ap.add_argument("--out", type=str, default="e3_pareto.csv")
     ap.add_argument("--outdir", type=str, default="runs/e3_pareto")
@@ -150,7 +155,15 @@ def main():
 
         for bb_name, bb_cfg in backbones:
             model = TinyEncoder(vocab_size=args.vocab, n_classes=n_classes, max_len=args.max_len, **bb_cfg)
-            model = train_compute_matched(model, train_pairs, pad_id, args.max_len, args.total_tokens, device=args.device)
+            model = train_compute_matched(
+                model,
+                train_pairs,
+                pad_id,
+                args.max_len,
+                args.total_tokens,
+                device=args.device,
+                probe_only=not args.full_finetune,
+            )
             acc = evaluate(model, test_pairs, pad_id, args.max_len, device=args.device)
 
             # latency on a small batch

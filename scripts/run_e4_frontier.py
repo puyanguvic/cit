@@ -80,6 +80,11 @@ def main():
     ap.add_argument("--vocabs", type=str, default="256,512,1024,2048,4096")
     ap.add_argument("--max-len", type=int, default=256)
     ap.add_argument("--total-tokens", type=int, default=2_000_000)
+    ap.add_argument(
+        "--full-finetune",
+        action="store_true",
+        help="Full fine-tuning of the encoder (much slower). Default is probe-only.",
+    )
     ap.add_argument("--device", type=str, default="cuda")
     ap.add_argument("--outdir", type=str, default="runs/e4_frontier")
     ap.add_argument("--seed", type=int, default=0)
@@ -181,7 +186,13 @@ def main():
             )
             t0_train = time.perf_counter()
             model = train_compute_matched(
-                model, train_pairs, pad_id, args.max_len, args.total_tokens, device=args.device
+                model,
+                train_pairs,
+                pad_id,
+                args.max_len,
+                args.total_tokens,
+                device=args.device,
+                probe_only=not args.full_finetune,
             )
             train_time_s = time.perf_counter() - t0_train
             acc = evaluate(model, test_pairs, pad_id, args.max_len, device=args.device)

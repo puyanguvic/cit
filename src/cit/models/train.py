@@ -42,6 +42,7 @@ def train_compute_matched(
     device: str = "cpu",
     batch_size: int = 64,
     lr: float = 3e-4,
+    probe_only: bool = False,
 ) -> nn.Module:
     """Train for a fixed *encoder-token* budget.
 
@@ -49,13 +50,25 @@ def train_compute_matched(
     We adjust the number of steps accordingly.
     """
     model = model.to(device)
+
+    # Probe-only training: freeze the encoder backbone and only train the
+    # classification head. This matches the paper's drop-in regime and
+    # is dramatically faster than full fine-tuning.
+    if probe_only:
+        for name, p in model.named_parameters():
+            # Keep only the classifier head trainable.
+            p.requires_grad = name.startswith("cls.")
     ds = SeqClsDataset(train_pairs)
 
     def collate(batch):
         return _collate(batch, pad_id, max_len)
 
     dl = DataLoader(ds, batch_size=batch_size, shuffle=True, collate_fn=collate, drop_last=True)
-    opt = optim.AdamW(model.parameters(), lr=lr)
+    params = [p for p in model.parameters() if p.requires_grad]
+    # Fallback: if the model has no explicit head, train all params.
+    if not params:
+        params = list(model.parameters())
+    opt = optim.AdamW(params, lr=lr)
     loss_fn = nn.CrossEntropyLoss()
 
     seen_tokens = 0
