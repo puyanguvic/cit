@@ -7,7 +7,7 @@
       "avg_len": 106.31292865185792,
       "p95_len": 111,
       "distortion_hat": 0.20627027908430753,
-      "p95_latency_ms": 1.3793280124664307
+      "p95_latency_ms": 1.411072015762329
     },
     {
       "tokenizer": "BPE",
@@ -16,25 +16,25 @@
       "avg_len": 106.31292865185792,
       "p95_len": 111,
       "distortion_hat": 0.20627027908430753,
-      "p95_latency_ms": 3.654655933380127
+      "p95_latency_ms": 4.230144023895264
     },
     {
       "tokenizer": "WordPiece",
       "backbone": "mini",
-      "acc": 0.8489098167673252,
+      "acc": 0.8481932644078206,
       "avg_len": 106.44098679496366,
       "p95_len": 112,
-      "distortion_hat": 0.1818801482713993,
-      "p95_latency_ms": 1.3813120126724243
+      "distortion_hat": 0.18484964404670767,
+      "p95_latency_ms": 1.9937280416488647
     },
     {
       "tokenizer": "WordPiece",
       "backbone": "small",
-      "acc": 0.8437915856280069,
+      "acc": 0.8405159176988433,
       "avg_len": 106.44098679496366,
       "p95_len": 112,
-      "distortion_hat": 0.1818801482713993,
-      "p95_latency_ms": 3.6823039054870605
+      "distortion_hat": 0.18484964404670767,
+      "p95_latency_ms": 5.922815799713135
     },
     {
       "tokenizer": "CIT",
@@ -43,7 +43,7 @@
       "avg_len": 60.534548060190396,
       "p95_len": 69,
       "distortion_hat": 0.13812096784252623,
-      "p95_latency_ms": 1.1683839559555054
+      "p95_latency_ms": 1.2042239904403687
     },
     {
       "tokenizer": "CIT",
@@ -52,7 +52,7 @@
       "avg_len": 60.534548060190396,
       "p95_len": 69,
       "distortion_hat": 0.13812096784252623,
-      "p95_latency_ms": 2.575360059738159
+      "p95_latency_ms": 3.6034560203552246
     }
   ]
 }

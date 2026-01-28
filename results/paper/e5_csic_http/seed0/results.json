@@ -1,0 +1,108 @@
+{
+  "rows": [
+    {
+      "dataset": "csic2010",
+      "model": "tiny",
+      "tokenizer": "BPE",
+      "acc": 0.8596,
+      "drift_acc": 0.4976,
+      "avg_len": 327.2294,
+      "p95_len": 514,
+      "vocab": 2048,
+      "max_len": 512,
+      "total_tokens": 10000000,
+      "seed": 0
+    },
+    {
+      "dataset": "csic2010",
+      "model": "tiny",
+      "tokenizer": "WordPiece",
+      "acc": 0.8888,
+      "drift_acc": 0.4968,
+      "avg_len": 329.449,
+      "p95_len": 526,
+      "vocab": 2048,
+      "max_len": 512,
+      "total_tokens": 10000000,
+      "seed": 0
+    },
+    {
+      "dataset": "csic2010",
+      "model": "tiny",
+      "tokenizer": "Unigram",
+      "acc": 0.8196,
+      "drift_acc": 0.5052,
+      "avg_len": 406.3974,
+      "p95_len": 595,
+      "vocab": 2048,
+      "max_len": 512,
+      "total_tokens": 10000000,
+      "seed": 0
+    },
+    {
+      "dataset": "csic2010",
+      "model": "tiny",
+      "tokenizer": "CIT",
+      "acc": 0.9044,
+      "drift_acc": 0.552,
+      "avg_len": 216.9894,
+      "p95_len": 416,
+      "vocab": 2048,
+      "max_len": 512,
+      "total_tokens": 10000000,
+      "seed": 0
+    },
+    {
+      "dataset": "csic2010",
+      "model": "base",
+      "tokenizer": "BPE",
+      "acc": 0.8754,
+      "drift_acc": 0.5166,
+      "avg_len": 327.2294,
+      "p95_len": 514,
+      "vocab": 2048,
+      "max_len": 512,
+      "total_tokens": 10000000,
+      "seed": 0
+    },
+    {
+      "dataset": "csic2010",
+      "model": "base",
+      "tokenizer": "WordPiece",
+      "acc": 0.7612,
+      "drift_acc": 0.4894,
+      "avg_len": 329.449,
+      "p95_len": 526,
+      "vocab": 2048,
+      "max_len": 512,
+      "total_tokens": 10000000,
+      "seed": 0
+    },
+    {
+      "dataset": "csic2010",
+      "model": "base",
+      "tokenizer": "Unigram",
+      "acc": 0.8598,
+      "drift_acc": 0.5022,
+      "avg_len": 406.3974,
+      "p95_len": 595,
+      "vocab": 2048,
+      "max_len": 512,
+      "total_tokens": 10000000,
+      "seed": 0
+    },
+    {
+      "dataset": "csic2010",
+      "model": "base",
+      "tokenizer": "CIT",
+      "acc": 0.6878,
+      "drift_acc": 0.6852,
+      "avg_len": 216.9894,
+      "p95_len": 416,
+      "vocab": 2048,
+      "max_len": 512,
+      "total_tokens": 10000000,
+      "seed": 0
+    }
+  ]
+}

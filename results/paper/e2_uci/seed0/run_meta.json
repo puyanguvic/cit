@@ -5,6 +5,7 @@
     "vocab": 2048,
     "max_len": 256,
     "total_tokens": 2000000,
+    "probe_only": false,
     "full_finetune": false,
     "device": "cuda",
     "seed": 0,

@@ -3,50 +3,58 @@
     {
       "dataset": "credit-g",
       "tokenizer": "BPE",
-      "acc": 0.7,
+      "acc": 0.71,
+      "majority_acc": 0.7,
       "avg_len": 141.755,
       "p95_len": 151,
       "distortion_hat": 0.09704186798765135,
       "vocab": 2048,
       "max_len": 256,
       "total_tokens": 2000000,
-      "seed": 0
+      "seed": 0,
+      "probe_only": false
     },
     {
       "dataset": "credit-g",
       "tokenizer": "WordPiece",
-      "acc": 0.7,
+      "acc": 0.65,
+      "majority_acc": 0.7,
       "avg_len": 141.685,
       "p95_len": 150,
-      "distortion_hat": 0.10014758951499357,
+      "distortion_hat": 0.10129181828559526,
       "vocab": 2048,
       "max_len": 256,
       "total_tokens": 2000000,
-      "seed": 0
+      "seed": 0,
+      "probe_only": false
     },
     {
       "dataset": "credit-g",
       "tokenizer": "Unigram",
-      "acc": 0.7,
+      "acc": 0.685,
+      "majority_acc": 0.7,
       "avg_len": 321.39,
       "p95_len": 339,
-      "distortion_hat": 0.16965447408225523,
+      "distortion_hat": 0.1723784218178874,
       "vocab": 2048,
       "max_len": 256,
       "total_tokens": 2000000,
-      "seed": 0
+      "seed": 0,
+      "probe_only": false
     },
     {
       "dataset": "credit-g",
       "tokenizer": "CIT",
-      "acc": 0.7,
+      "acc": 0.695,
+      "majority_acc": 0.7,
       "avg_len": 99.09,
       "p95_len": 113,
       "distortion_hat": 0.07978479950830827,
       "vocab": 2048,
       "max_len": 256,
       "total_tokens": 2000000,
-      "seed": 0
+      "seed": 0,
+      "probe_only": false
     }
   ]
 }

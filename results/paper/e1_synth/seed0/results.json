@@ -2,31 +2,39 @@
   "runs": [
     {
       "tokenizer": "BPE",
-      "test_acc": 0.093,
-      "drift_acc": 0.057,
-      "rate_E_len": 644.111,
-      "distortion_hat": 0.7485417725375648
+      "test_acc": 0.0485,
+      "drift_acc": 0.045,
+      "rate_E_len": 644.9175,
+      "distortion_hat": 0.7485417725375648,
+      "seed": 0,
+      "vocab": 2048
     },
     {
       "tokenizer": "WordPiece",
-      "test_acc": 0.076,
-      "drift_acc": 0.1,
-      "rate_E_len": 647.302,
-      "distortion_hat": 0.6687054440660939
+      "test_acc": 0.045,
+      "drift_acc": 0.046000000000000006,
+      "rate_E_len": 648.1055,
+      "distortion_hat": 0.6685781915161041,
+      "seed": 0,
+      "vocab": 2048
     },
     {
       "tokenizer": "Unigram",
-      "test_acc": 0.113,
-      "drift_acc": 0.083,
-      "rate_E_len": 690.6665,
-      "distortion_hat": 0.6669006265470748
+      "test_acc": 0.0555,
+      "drift_acc": 0.052000000000000005,
+      "rate_E_len": 691.717,
+      "distortion_hat": 0.6669006265470748,
+      "seed": 0,
+      "vocab": 2048
     },
     {
       "tokenizer": "CIT",
       "test_acc": 1.0,
-      "drift_acc": 0.8410000000000001,
+      "drift_acc": 0.8540000000000001,
       "rate_E_len": 81.0,
-      "distortion_hat": 0.29472332116541583
+      "distortion_hat": 0.29472332116541583,
+      "seed": 0,
+      "vocab": 2048
     }
   ]
 }
