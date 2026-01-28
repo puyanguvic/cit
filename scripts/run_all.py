@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """One-click runner for CIT paper experiments.
 
-Runs E1/E2/E3/E4 and (optionally) plots frontier figures.
+Runs E1/E2/E3/E4/E5 and (optionally) plots frontier figures.
 All outputs are saved under results/<outdir>/seedK/...
 
 Examples:
@@ -34,11 +34,30 @@ def main():
     ap.add_argument("--vocabs", type=str, default="256,512,1024,2048,4096", help="Vocab sweep list for E4")
     ap.add_argument("--plot", action="store_true", help="Generate plots where applicable (E4)")
     ap.add_argument(
+        "--e5-data-dir",
+        type=str,
+        default="data/csic2010",
+        help="Data directory for E5 CSIC 2010 (ignored if E5 disabled).",
+    )
+    ap.add_argument(
+        "--auto-download",
+        dest="auto_download",
+        action="store_true",
+        help="Auto-download CSIC 2010 data for E5 (default).",
+    )
+    ap.add_argument(
+        "--no-auto-download",
+        dest="auto_download",
+        action="store_false",
+        help="Disable auto-download for E5.",
+    )
+    ap.add_argument(
         "--only",
         type=str,
         default="",
         help="Comma-separated subset of experiments to run: e1,e2,e3,e4,e5 (default: run all)",
     )
+    ap.set_defaults(auto_download=True)
     args = ap.parse_args()
 
     only = [x.strip().lower() for x in args.only.split(",") if x.strip()]
@@ -81,22 +100,12 @@ def main():
             e4_args.append("--plot")
         run("run_e4_frontier.py", e4_args)
 
-    # E5 (end-to-end on public phishing-email dataset; auto-download via HF datasets)
+    # E5 (CSIC 2010 HTTP) + optional auto-download
     if enabled("e5"):
-        run(
-            "run_e5_end2end_phish.py",
-            common
-            + [
-                "--outdir",
-                f"{args.outroot}/e5_end2end_phish",
-                "--max_len",
-                "512",
-                "--model_families",
-                "mini",
-                "--total_tokens",
-                "5000000",
-            ],
-        )
+        e5_args = common + ["--data-dir", args.e5_data_dir, "--outdir", f"{args.outroot}/e5_csic_http"]
+        if args.auto_download:
+            e5_args.append("--auto-download")
+        run("run_e5_csic_http.py", e5_args)
 
     print("\n[OK] All requested experiments finished.")
     print(f"Results root: results/{args.outroot}/seed{args.seed} (and per-experiment subfolders)")

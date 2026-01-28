@@ -145,7 +145,7 @@ def main():
     backbones = [(name, get_family_cfg(name)) for name in fams]
 
     rows = []
-    dcfg = DistortionCfg(sample_size=2000, seed=args.seed)
+    dcfg = DistortionCfg(sample_size=2000, seed=args.seed, show_progress=True)
     for tok_name, enc in tokenizers:
         tr_ids = enc(Xtr)
         te_ids = enc(Xte)

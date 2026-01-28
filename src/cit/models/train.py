@@ -4,10 +4,13 @@ import os
 
 from typing import Callable, List, Optional, Sequence, Tuple
 
+import sys
+
 import torch
 from torch.utils.data import DataLoader, Dataset
 import torch.nn as nn
 import torch.optim as optim
+from tqdm import tqdm
 
 
 class SeqClsDataset(Dataset):
@@ -49,6 +52,8 @@ def train_compute_matched(
     eval_pairs: Optional[Sequence[Tuple[List[int], int]]] = None,
     eval_every_tokens: int = 200_000,
     on_log: Optional[Callable[[dict], None]] = None,
+    show_progress: bool = True,
+    progress_desc: str = "train_model",
 ) -> nn.Module:
     """Train for a fixed *encoder-token* budget.
 
@@ -85,6 +90,16 @@ def train_compute_matched(
     model.train()
     it = iter(dl)
     t0 = time.time()
+    pbar = None
+    if show_progress and total_tokens > 0:
+        pbar = tqdm(
+            total=total_tokens,
+            desc=progress_desc,
+            dynamic_ncols=True,
+            leave=True,
+            disable=not sys.stderr.isatty(),
+        )
+    prev_seen = 0
 
     def _emit(rec: dict):
         if on_log is not None:
@@ -111,6 +126,10 @@ def train_compute_matched(
         opt.step()
 
         seen_tokens += int(m.sum().item())
+        if pbar is not None:
+            new_seen = min(seen_tokens, total_tokens)
+            pbar.update(new_seen - prev_seen)
+            prev_seen = new_seen
 
         # Lightweight logging/evaluation (token-budget aligned).
         if log_path is not None or on_log is not None:
@@ -133,4 +152,6 @@ def train_compute_matched(
                 _emit(rec)
                 last_eval_at = seen_tokens
 
+    if pbar is not None:
+        pbar.close()
     return model

@@ -1,0 +1,14 @@
+{
+  "experiment": "e2_uci",
+  "args": {
+    "dataset": "credit-g",
+    "vocab": 2048,
+    "max_len": 256,
+    "total_tokens": 2000000,
+    "full_finetune": false,
+    "device": "cuda",
+    "seed": 0,
+    "outdir": "paper/e2_uci",
+    "out": ""
+  }
+}

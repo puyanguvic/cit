@@ -19,11 +19,22 @@ token-prefix budget).
 from __future__ import annotations
 
 from dataclasses import dataclass
+from inspect import signature
+import sys
 from typing import Callable, Iterable, List, Sequence, Tuple
 
 import numpy as np
+from tqdm import tqdm
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.linear_model import LogisticRegression
+
+
+def _make_logreg(**kwargs) -> LogisticRegression:
+    # Filter kwargs for sklearn version compatibility (e.g., multi_class removed).
+    sig = signature(LogisticRegression)
+    kwargs.pop("n_jobs", None)
+    filtered = {k: v for k, v in kwargs.items() if k in sig.parameters}
+    return LogisticRegression(**filtered)
 
 
 def estimate_rate(token_ids: Sequence[Sequence[int]]) -> float:
@@ -53,6 +64,9 @@ class DistortionCfg:
     # Char n-gram features (kept small for speed).
     ngram_range: Tuple[int, int] = (3, 5)
     max_features: int = 20000
+    # Progress display
+    show_progress: bool = False
+    progress_desc: str = "distortion"
 
 
 def estimate_surrogate_distortion(
@@ -90,7 +104,16 @@ def estimate_surrogate_distortion(
 
     kls: List[float] = []
 
-    for t in cfg.char_prefix_ts:
+    ts_iter = cfg.char_prefix_ts
+    if cfg.show_progress and sys.stderr.isatty():
+        ts_iter = tqdm(
+            ts_iter,
+            desc=cfg.progress_desc,
+            leave=False,
+            dynamic_ncols=True,
+            disable=False,
+        )
+    for t in ts_iter:
         tr_pref = [s[:t] for s in tr_texts]
         va_pref = [s[:t] for s in va_texts]
 
@@ -102,8 +125,9 @@ def estimate_surrogate_distortion(
         )
         Xtr = vec.fit_transform(tr_pref)
         Xva = vec.transform(va_pref)
-        teacher = LogisticRegression(
-            max_iter=200,
+        teacher = _make_logreg(
+            max_iter=1000,
+            tol=1e-3,
             n_jobs=1,
             random_state=int(cfg.seed),
             multi_class="auto",
@@ -128,8 +152,9 @@ def estimate_surrogate_distortion(
                 if 0 <= tid < vocab_size:
                     Xva_s[i, tid] += 1.0
 
-        student = LogisticRegression(
-            max_iter=200,
+        student = _make_logreg(
+            max_iter=1000,
+            tol=1e-3,
             n_jobs=1,
             random_state=int(cfg.seed) + 13,
             multi_class="auto",

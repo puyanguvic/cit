@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from inspect import signature
+
 import torch
 import torch.nn as nn
 
@@ -28,7 +30,10 @@ class TinyEncoder(nn.Module):
             batch_first=True,
             activation="gelu",
         )
-        self.encoder = nn.TransformerEncoder(enc_layer, num_layers=n_layers)
+        encoder_kwargs = {"num_layers": n_layers, "enable_nested_tensor": False}
+        enc_sig = signature(nn.TransformerEncoder)
+        encoder_kwargs = {k: v for k, v in encoder_kwargs.items() if k in enc_sig.parameters}
+        self.encoder = nn.TransformerEncoder(enc_layer, **encoder_kwargs)
         self.norm = nn.LayerNorm(d_model)
         self.cls = nn.Linear(d_model, n_classes)
 
@@ -48,3 +53,51 @@ class TinyEncoder(nn.Module):
             w = attention_mask.unsqueeze(-1).float()
             pooled = (x * w).sum(dim=1) / w.sum(dim=1).clamp_min(1.0)
         return self.cls(pooled)
+
+
+class SmallEncoder(TinyEncoder):
+    """Medium encoder-only transformer."""
+
+    def __init__(
+        self,
+        vocab_size: int,
+        n_classes: int,
+        d_model: int = 256,
+        n_layers: int = 4,
+        n_heads: int = 8,
+        dropout: float = 0.1,
+        max_len: int = 256,
+    ) -> None:
+        super().__init__(
+            vocab_size=vocab_size,
+            n_classes=n_classes,
+            d_model=d_model,
+            n_layers=n_layers,
+            n_heads=n_heads,
+            dropout=dropout,
+            max_len=max_len,
+        )
+
+
+class BaseEncoder(TinyEncoder):
+    """Larger encoder-only transformer."""
+
+    def __init__(
+        self,
+        vocab_size: int,
+        n_classes: int,
+        d_model: int = 384,
+        n_layers: int = 6,
+        n_heads: int = 12,
+        dropout: float = 0.1,
+        max_len: int = 256,
+    ) -> None:
+        super().__init__(
+            vocab_size=vocab_size,
+            n_classes=n_classes,
+            d_model=d_model,
+            n_layers=n_layers,
+            n_heads=n_heads,
+            dropout=dropout,
+            max_len=max_len,
+        )

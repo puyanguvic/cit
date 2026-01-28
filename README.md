@@ -50,9 +50,15 @@ This produces `runs/e4_frontier/seed0/results.csv` and `frontier.csv`, plus toke
 ### E5 (end-to-end): CSIC 2010 HTTP
 
 E5 trains the encoder end-to-end (no probe-only freezing) under a *token-fair* compute budget on a structured public HTTP dataset.
-To keep the repo self-contained, the script does not download datasets automatically.
+You can let the script auto-download a public CSV mirror, or provide the raw CSIC files yourself.
 
-Place CSIC 2010 raw files under a directory such as `data/csic2010/`, e.g.:
+Option A (auto-download):
+
+```bash
+python scripts/run_e5_csic_http.py --data-dir data/csic2010 --device cuda --seed 0 --auto-download
+```
+
+Option B (manual data placement). Place CSIC 2010 raw files under a directory such as `data/csic2010/`, e.g.:
 
 ```text
 data/csic2010/
@@ -82,7 +88,7 @@ All experiment outputs are written under the top-level `results/` folder.
 
 ## One-click paper runs
 
-All scripts write outputs under `results/`.
+All scripts write outputs under `results/`. The default one-click runner includes E5 and will auto-download CSIC 2010 if missing.
 
 ```bash
 python scripts/run_all.py --device cuda --seed 0 --plot
@@ -93,3 +99,10 @@ This will populate:
 - `results/paper/e2_uci/seed0/...`
 - `results/paper/e3_pareto/seed0/...`
 - `results/paper/e4_frontier/seed0/...` (plus `frontier_*.pdf/png`)
+ - `results/paper/e5_csic_http/seed0/...`
+
+To disable auto-download for E5:
+
+```bash
+python scripts/run_all.py --device cuda --seed 0 --plot --no-auto-download
+```

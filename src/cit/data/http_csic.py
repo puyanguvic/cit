@@ -31,7 +31,7 @@ from typing import Dict, Iterable, List, Sequence, Tuple
 
 import pandas as pd
 
-from .serialize import SerializeCfg, serialize_iter
+from .serialize import SerializeCfg, serialize_df, serialize_iter
 
 
 _REQ_SPLIT_RE = re.compile(r"\r?\n\r?\n")
@@ -145,6 +145,26 @@ def _parse_http_request(req: str, max_headers: int = 16) -> Dict[str, str]:
     return rec
 
 
+def _normalize_labels(series: pd.Series) -> List[int]:
+    if pd.api.types.is_numeric_dtype(series):
+        return series.astype(int).tolist()
+    s = series.astype(str).str.strip().str.lower()
+    mapping = {
+        "normal": 0,
+        "norm": 0,
+        "benign": 0,
+        "attack": 1,
+        "anomalous": 1,
+        "anom": 1,
+        "anon": 1,
+        "anomaly": 1,
+        "malicious": 1,
+        "1": 1,
+        "0": 0,
+    }
+    return s.map(mapping).fillna(0).astype(int).tolist()
+
+
 def load_csic2010_http(
     data_dir: str,
     n_train: int = 20000,
@@ -159,15 +179,32 @@ def load_csic2010_http(
     """
     serialize_cfg = serialize_cfg or SerializeCfg()
 
-    # Option 1: CSV/TSV with text,label
+    # Option 1: CSV/TSV
     csv_path = _find_first_existing(data_dir, ["csic2010.csv", "csic2010.tsv", "data.csv", "data.tsv"])
     if csv_path is not None:
         df = pd.read_csv(csv_path, sep="\t" if csv_path.endswith(".tsv") else ",")
-        if "text" not in df.columns or "label" not in df.columns:
-            raise ValueError(f"Expected columns text,label in {csv_path}")
-        texts = df["text"].astype(str).tolist()
-        labels = df["label"].astype(int).tolist()
+        cols_lower = {c.lower(): c for c in df.columns}
+        label_key = None
+        for k in ("label", "class", "classification", "target"):
+            if k in cols_lower:
+                label_key = k
+                break
+        if label_key is None:
+            raise ValueError(f"Expected a label/class column in {csv_path}")
+        label_col = cols_lower[label_key]
+        labels = _normalize_labels(df[label_col])
+        if "text" in cols_lower:
+            # Raw HTTP requests provided as text.
+            text_col = cols_lower["text"]
+            texts = df[text_col].astype(str).tolist()
+            needs_parse = True
+        else:
+            # Structured CSV: serialize remaining columns directly.
+            feat_df = df.drop(columns=[label_col])
+            texts = serialize_df(feat_df, serialize_cfg)
+            needs_parse = False
     else:
+        needs_parse = True
         normal_path = _find_first_existing(
             data_dir,
             ["normal.txt", "normalTrafficTraining.txt", "normalTrafficTest.txt", "normalTraffic*.txt"],
@@ -207,9 +244,11 @@ def load_csic2010_http(
     def build(indices: Sequence[int]) -> Tuple[List[str], List[int]]:
         reqs = [texts[i] for i in indices]
         ys = [labels[i] for i in indices]
-        recs = [_parse_http_request(r) for r in reqs]
-        ser = serialize_iter(recs, serialize_cfg)
-        return ser, ys
+        if needs_parse:
+            recs = [_parse_http_request(r) for r in reqs]
+            ser = serialize_iter(recs, serialize_cfg)
+            return ser, ys
+        return reqs, ys
 
     tr_x, tr_y = build(i_train)
     va_x, va_y = build(i_val)

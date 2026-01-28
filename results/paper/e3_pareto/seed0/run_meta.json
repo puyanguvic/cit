@@ -1,0 +1,14 @@
+{
+  "experiment": "e3_pareto",
+  "args": {
+    "vocab": 2048,
+    "max_len": 512,
+    "total_tokens": 5000000,
+    "model_families": "mini,small",
+    "full_finetune": true,
+    "device": "cuda",
+    "out": "e3_pareto.csv",
+    "outdir": "paper/e3_pareto",
+    "seed": 0
+  }
+}

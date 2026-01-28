@@ -119,7 +119,7 @@ def main():
     t_measure = Xte[:1000]
 
     rows: list[dict] = []
-    dcfg = DistortionCfg(sample_size=args.dist_samples, seed=args.seed)
+    dcfg = DistortionCfg(sample_size=args.dist_samples, seed=args.seed, show_progress=True)
 
     for vocab_size in vocabs:
         print(f"\n=== vocab_size={vocab_size} ===")
@@ -231,14 +231,14 @@ def main():
         w.writerows(frontier)
     save_json({"frontier": frontier}, outdir / "frontier.json")
 
+    # Optional: auto-plot for paper figures
+    if args.plot:
+        import subprocess, sys
 
-# Optional: auto-plot for paper figures
-if args.plot:
-    import subprocess, sys
-    script = Path(__file__).parent / "plot_frontier.py"
-    subprocess.check_call([sys.executable, str(script), "--run_dir", str(outdir)])
-    print("\nSaved:", out_csv)
-    print("Saved:", out_f)
+        script = Path(__file__).parent / "plot_frontier.py"
+        subprocess.check_call([sys.executable, str(script), "--run_dir", str(outdir)])
+        print("\nSaved:", out_csv)
+        print("Saved:", out_f)
 
 
 if __name__ == "__main__":

@@ -15,6 +15,8 @@ from __future__ import annotations
 
 import argparse
 import csv
+import subprocess
+import sys
 from pathlib import Path
 from typing import Callable, List, Tuple
 
@@ -82,6 +84,11 @@ def main():
     ap.add_argument("--n-train", type=int, default=20000)
     ap.add_argument("--n-val", type=int, default=5000)
     ap.add_argument("--n-test", type=int, default=5000)
+    ap.add_argument(
+        "--auto-download",
+        action="store_true",
+        help="If set, download and prepare the CSIC 2010 CSVs from lexr.ai when data-dir is missing.",
+    )
     args = ap.parse_args()
 
     set_seed(args.seed)
@@ -92,6 +99,25 @@ def main():
     outdir = (Path("results") / user_out) / f"seed{args.seed}"
     outdir.mkdir(parents=True, exist_ok=True)
     save_run_metadata(outdir, exp_name="e5_csic_http", args=vars(args))
+
+    if args.auto_download:
+        data_dir = Path(args.data_dir)
+        have_dir = data_dir.exists()
+        has_data = False
+        if have_dir:
+            for name in ["csic2010.csv", "csic2010.tsv", "data.csv", "data.tsv"]:
+                if (data_dir / name).exists():
+                    has_data = True
+                    break
+            if not has_data:
+                for pat in ["normal.txt", "normalTraffic*.txt", "anomalous.txt", "anomalousTraffic*.txt"]:
+                    if list(data_dir.glob(pat)):
+                        has_data = True
+                        break
+        if not have_dir or not has_data:
+            setup_script = Path(__file__).parent / "setup_csic2010_lexr.py"
+            print(f"[auto-download] Preparing CSIC 2010 dataset under {data_dir} ...")
+            subprocess.check_call([sys.executable, str(setup_script), "--out", str(data_dir)])
 
     Xtr, ytr, Xva, yva, Xte, yte = load_csic2010_http(
         args.data_dir, n_train=args.n_train, n_val=args.n_val, n_test=args.n_test, seed=args.seed

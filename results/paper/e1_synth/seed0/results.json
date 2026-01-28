@@ -1,0 +1,32 @@
+{
+  "runs": [
+    {
+      "tokenizer": "BPE",
+      "test_acc": 0.093,
+      "drift_acc": 0.057,
+      "rate_E_len": 644.111,
+      "distortion_hat": 0.7485417725375648
+    },
+    {
+      "tokenizer": "WordPiece",
+      "test_acc": 0.076,
+      "drift_acc": 0.1,
+      "rate_E_len": 647.302,
+      "distortion_hat": 0.6687054440660939
+    },
+    {
+      "tokenizer": "Unigram",
+      "test_acc": 0.113,
+      "drift_acc": 0.083,
+      "rate_E_len": 690.6665,
+      "distortion_hat": 0.6669006265470748
+    },
+    {
+      "tokenizer": "CIT",
+      "test_acc": 1.0,
+      "drift_acc": 0.8410000000000001,
+      "rate_E_len": 81.0,
+      "distortion_hat": 0.29472332116541583
+    }
+  ]
+}

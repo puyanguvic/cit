@@ -11,6 +11,7 @@ to better match the paper's prefix formulation.
 
 from __future__ import annotations
 
+from inspect import signature
 from typing import Iterable, List, Sequence
 
 import numpy as np
@@ -32,6 +33,14 @@ def featurize_token_ids(token_ids: Sequence[Sequence[int]], vocab_size: int) -> 
     return X
 
 
+def _make_logreg(**kwargs) -> LogisticRegression:
+    # Filter kwargs for sklearn version compatibility (e.g., multi_class removed).
+    sig = signature(LogisticRegression)
+    kwargs.pop("n_jobs", None)
+    filtered = {k: v for k, v in kwargs.items() if k in sig.parameters}
+    return LogisticRegression(**filtered)
+
+
 def estimate_ce(
     token_ids_train: Sequence[Sequence[int]],
     y_train: Sequence[int],
@@ -43,8 +52,9 @@ def estimate_ce(
     """Teacher-aligned cross-entropy proxy using a simple probe."""
     Xtr = featurize_token_ids(token_ids_train, vocab_size)
     Xva = featurize_token_ids(token_ids_val, vocab_size)
-    clf = LogisticRegression(
-        max_iter=200,
+    clf = _make_logreg(
+        max_iter=1000,
+        tol=1e-3,
         n_jobs=1,
         random_state=seed,
         multi_class="auto",

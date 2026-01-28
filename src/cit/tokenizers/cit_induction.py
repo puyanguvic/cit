@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import sys
 from typing import Dict, Iterable, List, Tuple
 
 import numpy as np
@@ -186,6 +187,10 @@ def train_cit(
     
     # greedily grow
     remaining = sorted(candidates.items(), key=lambda kv: kv[1], reverse=True)
+    # Remove any tokens already present to keep progress accounting accurate.
+    remaining = [(tok, freq) for tok, freq in remaining if tok not in vocab]
+    need = max(0, cfg.vocab_size - len(vocab))
+    total_adds = min(need, len(remaining))
 
     # Helper: write periodic log snapshot (cheap)
     def _maybe_log(step_token: str | None = None, score: float | None = None):
@@ -217,7 +222,13 @@ def train_cit(
     # This keeps induction deterministic and scalable, while distortion is still
     # reported (and can be used) at evaluation time.
     if cfg.mode.lower() == "fast":
-        pbar = tqdm(total=cfg.vocab_size - len(vocab), desc="train_cit", leave=False)
+        pbar = tqdm(
+            total=total_adds,
+            desc="train_cit",
+            leave=True,
+            dynamic_ncols=True,
+            disable=not sys.stderr.isatty(),
+        )
         for tok, freq in remaining:
             if len(vocab) >= cfg.vocab_size:
                 break
@@ -238,7 +249,13 @@ def train_cit(
         # Full mode: distortion-aware greedy selection, but amortized:
         #  - consider only cfg.candidate_batch candidates per step
         #  - compute distortion for only top cfg.topk_dist candidates by gain
-        pbar = tqdm(total=cfg.vocab_size - len(vocab), desc="train_cit", leave=False)
+        pbar = tqdm(
+            total=total_adds,
+            desc="train_cit",
+            leave=True,
+            dynamic_ncols=True,
+            disable=not sys.stderr.isatty(),
+        )
         while len(vocab) < cfg.vocab_size and remaining:
             batch = remaining[: cfg.candidate_batch]
             remaining = remaining[cfg.candidate_batch :]

@@ -40,9 +40,14 @@ def main():
     ap.add_argument("--max-len", type=int, default=256)
     ap.add_argument("--total-tokens", type=int, default=2_000_000)
     ap.add_argument(
+        "--probe-only",
+        action="store_true",
+        help="Freeze encoder weights (requires pretrained encoder). Default: full fine-tune.",
+    )
+    ap.add_argument(
         "--full-finetune",
         action="store_true",
-        help="Full fine-tuning of the encoder (much slower). Default is probe-only.",
+        help="(Deprecated) Kept for backward compatibility. Full fine-tune is now the default.",
     )
     ap.add_argument("--device", type=str, default="cuda")
     ap.add_argument("--seed", type=int, default=0)
@@ -103,10 +108,10 @@ def main():
         ("CIT", lambda t: [tokenize_longest_match(apply_contract(s, cit_contract), cit_vocab) for s in t]),
     ]
 
-    dcfg = DistortionCfg(sample_size=2000, seed=args.seed)
+    dcfg = DistortionCfg(sample_size=2000, seed=args.seed, show_progress=True)
 
-    # Default to probe-only (drop-in regime) unless explicitly requested.
-    args.probe_only = not args.full_finetune
+    # Default to full fine-tune. Respect explicit probe-only requests.
+    probe_only = bool(args.probe_only) and (not args.full_finetune)
 
     rows = []
     for name, enc in encoders:
@@ -124,9 +129,14 @@ def main():
             args.max_len,
             args.total_tokens,
             device=args.device,
-            probe_only=not args.full_finetune,
+            probe_only=probe_only,
         )
         acc = evaluate(model, test_pairs, pad_id, args.max_len, device=args.device)
+
+        counts = {}
+        for yy in ds.y_train.tolist():
+            counts[yy] = counts.get(yy, 0) + 1
+        majority = max(counts.values()) / float(sum(counts.values()))
 
         avg_len = estimate_rate(te_ids)
         p95 = sorted([len(s) for s in te_ids])[int(0.95 * len(te_ids))]
@@ -142,6 +152,7 @@ def main():
             "dataset": args.dataset,
             "tokenizer": name,
             "acc": acc,
+            "majority_acc": majority,
             "avg_len": avg_len,
             "p95_len": p95,
             "distortion_hat": float(dist),
@@ -149,9 +160,14 @@ def main():
             "max_len": args.max_len,
             "total_tokens": args.total_tokens,
             "seed": args.seed,
+            "probe_only": probe_only,
         }
         rows.append(row)
-        print(f"{args.dataset}\t{name}\tacc={acc:.4f}\tavg_len={avg_len:.1f}\tp95_len={p95}")
+        tag = " (≈majority)" if abs(acc - majority) < 1e-3 else ""
+        print(
+            f"{args.dataset}\t{name}\tacc={acc:.4f}\tmajority={majority:.4f}{tag}\t"
+            f"avg_len={avg_len:.1f}\tp95_len={p95}"
+        )
 
     if args.out:
         outp = Path(args.out)
