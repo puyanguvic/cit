@@ -1,0 +1,25 @@
+# Python bytecode
+__pycache__/
+*.py[cod]
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Experiment outputs / logs
+results/
+*.jsonl
+*.pt
+*.pth
+*.ckpt
+
+# Data downloads (keep small curated CSVs if committed)
+# Paper datasets are not tracked; scripts can auto-download as needed.
+data/csic2010/

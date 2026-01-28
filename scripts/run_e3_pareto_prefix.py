@@ -88,7 +88,7 @@ def main():
         help="Full fine-tuning of the encoder. Recommended for E3; probe-only on a random backbone collapses.",
     )
     ap.add_argument("--device", type=str, default="cuda")
-    ap.add_argument("--out", type=str, default="e3_pareto.csv")
+    ap.add_argument("--out", type=str, default="", help="Optional legacy CSV output path (in addition to results/...)")
     ap.add_argument("--outdir", type=str, default="runs/e3_pareto")
     ap.add_argument("--seed", type=int, default=0)
     args = ap.parse_args()
@@ -202,11 +202,12 @@ def main():
             )
             print(tok_name, bb_name, "acc", acc, "p95_ms", p95_ms)
 
-    out_csv = Path(args.out)
-    with out_csv.open("w", newline="") as f:
-        w = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
-        w.writeheader()
-        w.writerows(rows)
+    if args.out:
+        out_csv = Path(args.out)
+        with out_csv.open("w", newline="") as f:
+            w = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
+            w.writeheader()
+            w.writerows(rows)
 
     # canonical copy inside outdir
     with (outdir / "results.csv").open("w", newline="") as f:

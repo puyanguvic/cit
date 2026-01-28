@@ -6,15 +6,19 @@
       "drift_acc": 0.045,
       "rate_E_len": 644.9175,
       "distortion_hat": 0.7485417725375648,
+      "oracle_acc": 0.0555,
+      "oracle_drift_acc": 0.07999999999999999,
       "seed": 0,
       "vocab": 2048
     },
     {
       "tokenizer": "WordPiece",
-      "test_acc": 0.045,
-      "drift_acc": 0.034,
-      "rate_E_len": 648.1305,
-      "distortion_hat": 0.6728220863491753,
+      "test_acc": 0.055,
+      "drift_acc": 0.051000000000000004,
+      "rate_E_len": 648.0765,
+      "distortion_hat": 0.6613767381493529,
+      "oracle_acc": 0.0555,
+      "oracle_drift_acc": 0.07999999999999999,
       "seed": 0,
       "vocab": 2048
     },
@@ -24,6 +28,8 @@
       "drift_acc": 0.053,
       "rate_E_len": 691.717,
       "distortion_hat": 0.6669006265470748,
+      "oracle_acc": 0.0555,
+      "oracle_drift_acc": 0.07999999999999999,
       "seed": 0,
       "vocab": 2048
     },
@@ -33,6 +39,8 @@
       "drift_acc": 0.8540000000000001,
       "rate_E_len": 81.0,
       "distortion_hat": 0.29472332116541583,
+      "oracle_acc": 0.0535,
+      "oracle_drift_acc": 0.06741666666666665,
       "seed": 0,
       "vocab": 2048
     }

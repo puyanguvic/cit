@@ -1,0 +1,774 @@
+\begin{abstract}
+Tokenization serves as a fixed interface between raw symbolic inputs and neural encoders, yet most existing tokenizers are optimized for large language models and natural language distributions.
+When used as drop-in components in structured and semi-structured prediction pipelines, such tokenizers induce uncontrolled compression that distorts role-dependent semantics and wastes token budget under tight compute constraints.
+We formalize tokenization as a constrained interface design problem and introduce \emph{directed semantic distortion}, a prefix-aligned measure of irrecoverable task-relevant information loss induced by the interface.
+Based on this formulation, we propose \textbf{Controlled Interface Tokenization (CIT)}, which enforces a versioned interface contract with role-explicit boundaries and typed-value integrity, and constructs task-specialized vocabularies by maximizing compression efficiency within the contract under deterministic execution.
+Directed semantic distortion is used to evaluate and calibrate semantic fidelity across tokenizers and budgets, yielding empirical rate--distortion frontiers.
+Across synthetic and public structured classification tasks, CIT achieves superior rate--distortion trade-offs, higher accuracy under matched token budgets, and improved robustness to semantics-preserving re-serialization and prefix-limited prediction.
+\end{abstract}
+
+\section{Introduction}
+\label{sec:intro}
+
+Tokenization is often treated as a benign preprocessing step.
+In encoder-only systems operating under hard sequence and latency budgets, it is instead a fixed \emph{representation interface}: inputs are deterministically serialized into strings and then irrevocably segmented into tokens, after which all computation is conditioned on the token sequence.
+In this strict drop-in setting, changing the tokenizer changes the interface contract between raw symbolic inputs and the encoder, and therefore changes which distinctions can \emph{ever} be represented, learned, and recovered under binding token budgets.
+
+Structured and semi-structured streams make this interface problem acute.
+Their semantics is role- and boundary-dependent: the same character substring may be a key, a delimiter, or a value depending on its position and surrounding syntax.
+They also contain high-cardinality fields (identifiers, timestamps, hashes, URLs) whose internal character patterns are unstable but whose span integrity is task-critical.
+Under deterministic left-to-right, prefix-emitting execution, tokenization induces a causal mapping from raw prefixes to tokenized prefixes.
+We call the resulting failure mode \emph{prefix semantic collapse}: two raw prefixes that correspond to different task-relevant semantic states become indistinguishable because they map to the same observable token prefix.
+Collapse is an interface property: once it happens, no downstream encoder operating under the same tokenizer can reconstruct a distinction that never reaches the model, regardless of model size or training recipe.
+This is especially damaging for streaming or early-decision settings and for any deployment with hard maximum sequence lengths.
+
+Canonical tokenizers fail on structured inputs in a structural way.
+WordPiece and BPE optimize subword statistics largely driven by natural language, without constraints that respect role boundaries or typed value spans.
+As a result, they may segment across boundary-bearing symbols, entangle role cues with incidental value fragments, and become brittle to semantics-preserving re-serialization (e.g., benign field reordering, whitespace/escaping normalization).
+Conversely, using finer-grained pieces to avoid brittleness often leads to heavy-tailed token lengths on high-cardinality fields, inflating attention cost and truncation risk.
+
+% \begin{figure}[t]
+% \centering
+% \begin{tokviz}
+% \tok{GET}\tok{\detokenize{ }}\tok{/}\tok{search}\tok{?}\tok{q}\tok{=}\tok{\detokenize{%}}\tok{E7}\tok{\detokenize{%}}\tok{82}\tok{\detokenize{%}}\tok{B8}\tok{\detokenize{%}}\tok{E9}\tok{\detokenize{%}}\tok{B8}\tok{\detokenize{%}}\tok{A1}%
+% \tok{\&}\tok{token}\tok{=}\tok{a}\tok{B}\tok{1}\tok{!}\tok{x}\tok{Y}\tok{9}\tok{@}\tok{z}\tok{Z}\tok{2}\tok{\#}%
+% \tok{\&}\tok{id}\tok{=}\tok{0}\tok{x}\tok{7}\tok{f}\tok{8}\tok{e}\tok{9}\tok{a}\tok{0}\tok{b}\tok{2}\tok{c}\tok{4}\tok{d}\tok{\detokenize{ }}\tok{HTTP}\tok{/}\tok{1.1}\\
+% \tok{Host}\tok{:}\tok{\detokenize{ }}\tok{127.0.0.1}\tok{:}\tok{8080}\\
+% \tok{X-Trace-ID}\tok{:}\tok{\detokenize{ }}\tok{550e8400}\tok{-}\tok{e29b}\tok{-}\tok{41d4}\tok{-}\tok{a716}\tok{-}\tok{446655440000}\\
+% \tok{Cookie}\tok{:}\tok{\detokenize{ }}\tok{sess}\tok{=}\tok{q}\tok{Wer}\tok{Ty}\tok{Ui}\tok{Op}\tok{12345}
+% \end{tokviz}
+% \vspace{-0.3em}
+% \caption{Token-boundary visualization for a representative semi-structured request under a canonical WordPiece tokenizer (BERT family). Colors indicate token boundaries. The segmentation fragments boundary-bearing symbols and high-cardinality fields into many short pieces, obscuring role/value structure and inflating effective token budget.}
+% \label{fig:intro_token_example}
+% \vspace{-0.8em}
+% \end{figure}
+
+We therefore treat tokenization for structured prediction as a constrained interface design problem.
+We introduce \emph{directed semantic distortion}, a prefix-aligned measure of irrecoverable task-relevant information loss incurred when prediction must be made from tokenized prefixes rather than raw prefixes.
+This yields a deployment-aligned rate--distortion view of tokenizers under vocabulary and sequence constraints.
+Building on this formulation, we propose \textbf{Controlled Interface Tokenization (CIT)}: a deterministic tokenizer that (i) enforces an explicit, versioned interface contract with role-preserving boundaries and typed-value integrity, and (ii) constructs task-specialized vocabularies by maximizing compression gain within the contract-feasible space under deployed prefix-emitting execution.
+
+\paragraph{Contributions.}
+Our contributions are:
+\begin{itemize}[leftmargin=1.25em, itemsep=0.2em, topsep=0.2em]
+    \item We identify \emph{prefix semantic collapse} as an interface failure mode for structured streams: distinct task-relevant prefix states become indistinguishable after prefix-emitting tokenization, creating irrecoverable information loss under any downstream encoder.
+    \item We propose \emph{directed semantic distortion}, a prefix-aligned, task-relevant measure of interface-induced information loss, enabling empirical rate--distortion analysis for tokenization interfaces.
+    \item We introduce \textbf{CIT}, a contract-constrained, deterministic tokenization system that preserves role boundaries and typed-value integrity while inducing deployment-aligned vocabularies under prefix-emitting execution.
+    \item We empirically validate a causal chain from interface to learning to system behavior: CIT avoids collapse on a synthetic prefix stress test, improves end-to-end learning and drift robustness under token-fair training on a public HTTP benchmark, and shifts the accuracy--latency Pareto frontier under fully trained encoder models.
+\end{itemize}
+
+The remainder of the paper develops the interface formulation, presents CIT, and evaluates its efficiency, robustness, and end-to-end impact under strict drop-in constraints.
+
+
+\section{Problem Formulation}
+\label{sec:formulation}
+
+We formalize tokenization as a representation interface for structured and semi-structured prediction under a strict drop-in regime.
+Our goal is to characterize how interface design induces an irreversible compression of task-relevant information, and to make this loss explicit and comparable across tokenizers.
+
+\subsection{Setup and Drop-in Regime}
+\label{sec:setup}
+
+Each input example originates from a structured or semi-structured record $r \in \mathcal{R}$, such as a tabular row, a key--value map, or a protocol/log event.
+To enable the use of encoder-only neural models, records are deterministically serialized into symbolic strings
+\begin{equation}
+X \;=\; s(r) \in \Sigma^\ast,
+\label{eq:serialization}
+\end{equation}
+where $\Sigma$ is a finite alphabet of characters or bytes.
+This record-to-text practice is widely used to reuse sequence models for non-linguistic inputs, including tabular and semi-structured prediction pipelines~\cite{yin2020tabert,herzig2020tapas}.
+
+A tokenizer is a mapping $\tau : \Sigma^\ast \rightarrow \mathcal{V}^\ast$ over a finite vocabulary $\mathcal{V}$, producing a token sequence
+\[
+Z \;=\; \tau(X).
+\]
+We focus on a strict \emph{drop-in regime}, in which the downstream encoder architecture, optimization procedure, and training budget are fixed (e.g., a given Transformer encoder~\cite{vaswani2017attention,devlin2019bert}).
+Under this regime, the tokenizer is the primary modifiable component, and its execution must be deterministic, reproducible, and compatible with deployment constraints.
+
+We assume \emph{prefix-emitting} execution: tokens are emitted left-to-right and never revised.
+For a raw prefix $X_{1:t}$, the observable tokenized prefix is
+\begin{equation}
+Z^{(t)} \;=\; \tau(X_{1:t}),
+\label{eq:prefix_tok}
+\end{equation}
+which is irrevocably determined by the prefix.
+This assumption models streaming and early-decision settings and induces a causal interface between the raw input stream and the model's available observations at inference time.
+
+\subsection{Semantic Prefix States and Interface Irreversibility}
+\label{sec:semantic_state}
+
+Prediction on structured inputs is inherently prefix-dependent.
+Let $Y$ denote the task semantics (e.g., a class label), and let $\ell$ be the task loss (e.g., cross-entropy).
+For each raw prefix $X_{1:t}$, we define the \emph{semantic prefix state} as the Bayes-optimal conditional distribution
+\begin{equation}
+\mathcal{S}(X_{1:t})
+\;\triangleq\;
+P^\star(\,\cdot \mid X_{1:t}),
+\label{eq:semantic_raw}
+\end{equation}
+which captures the strongest achievable semantics given direct access to the raw prefix.
+This definition abstracts away nuisance variation and retains exactly the information relevant for prediction under the chosen loss~\cite{cover1999elements,tishby2000information}.
+
+Tokenization restricts access to the raw input by exposing only the tokenized prefix $Z^{(t)}$.
+Fix a reference predictor family $\mathcal{Q}$ whose members map tokenized prefixes to predictive distributions over $Y$.
+The best achievable semantics under the interface at prefix length $t$ is
+\begin{equation}
+\mathcal{S}_\tau(Z^{(t)})
+\;\triangleq\;
+\arg\min_{q \in \mathcal{Q}}
+\;
+\mathbb{E}\!\left[\ell\!\left(q(\,\cdot \mid Z^{(t)}), Y\right)\right].
+\label{eq:semantic_tok}
+\end{equation}
+
+Because $\tau$ is deterministic and prefix-emitting, the mapping $X_{1:t} \mapsto Z^{(t)}$ is generally many-to-one.
+Distinct raw prefixes can therefore induce the same observable token prefix, forcing any token-observing predictor to average over their semantics.
+This identifies a fundamental \emph{irreversibility} at the interface: once two raw prefixes collapse to the same $Z^{(t)}$, no downstream encoder-only model can distinguish them without modifying the interface itself.
+In structured settings, such collapse commonly arises when segmentation crosses role boundaries or fragments high-cardinality values whose internal characters are semantically irrelevant but whose integrity is role-critical~\cite{yin2020tabert,herzig2020tapas}.
+
+\subsection{Directed Semantic Distortion}
+\label{sec:distortion}
+
+We quantify irrecoverable semantic loss induced by tokenization through a prefix-aligned, directed distortion.
+Intuitively, distortion measures how much task-relevant semantic resolution is lost when prediction must be made from $Z^{(t)}$ rather than directly from $X_{1:t}$.
+
+Let $\mathcal{R}^\star(t)$ denote the Bayes risk at prefix length $t$,
+\begin{equation}
+\mathcal{R}^\star(t)
+\;\triangleq\;
+\mathbb{E}\!\left[\ell\!\left(\mathcal{S}(X_{1:t}), Y\right)\right],
+\label{eq:bayes_raw}
+\end{equation}
+and let $\mathcal{R}_\tau(t)$ denote the minimum achievable risk when only the tokenized prefix is observed,
+\begin{equation}
+\mathcal{R}_\tau(t)
+\;\triangleq\;
+\min_{q \in \mathcal{Q}}
+\mathbb{E}\!\left[\ell\!\left(q(\,\cdot \mid Z^{(t)}), Y\right)\right].
+\label{eq:bayes_tok}
+\end{equation}
+The \emph{directed semantic distortion} of tokenizer $\tau$ is defined as the average excess risk over prefixes:
+\begin{equation}
+\Delta(\tau)
+\;\triangleq\;
+\mathbb{E}\!\left[
+\frac{1}{T}\sum_{t=1}^{T}
+\big(\mathcal{R}_\tau(t) - \mathcal{R}^\star(t)\big)
+\right].
+\label{eq:distortion}
+\end{equation}
+
+This definition makes three properties explicit.
+First, $\Delta(\tau)\ge 0$ by construction: restricting observations from $X_{1:t}$ to $Z^{(t)}$ cannot improve the best achievable risk.
+Second, $\Delta(\tau)$ is an \emph{interface-level} quantity: it depends only on what information the tokenizer preserves about prefixes and upper-bounds the performance of any downstream encoder-only model operating under the same interface.
+Third, prefix averaging penalizes interfaces that delay task-relevant information to later tokens, which is critical under truncation and token-budget constraints.
+
+In practice, $\Delta(\tau)$ is not directly observable because it depends on Bayes-optimal semantics.
+In our experiments, we estimate a surrogate distortion using a teacher--student construction, where a reference predictor observes raw prefixes and a restricted predictor observes tokenized prefixes.
+We use this surrogate \emph{only for evaluation and calibration}, so that measured gaps reflect interface-induced information loss rather than representation adaptation~\cite{hinton2015distilling}.
+
+\subsection{Rate--Distortion Trade-off under Drop-in Constraints}
+\label{sec:rate_distortion}
+
+Tokenization induces a compression of the raw input prior to learning.
+We quantify interface cost by the expected token length
+\begin{equation}
+R(\tau) \;\triangleq\; \mathbb{E}[|Z|],
+\label{eq:rate}
+\end{equation}
+which directly controls effective context length and inference cost in encoder-only models.
+
+Let $B$ denote a vocabulary budget, and define the drop-in feasible set
+\begin{equation}
+\mathcal{T}_{\mathrm{drop}}(B)
+\;=\;
+\big\{
+\tau \;\big|\;
+|\mathcal{V}| \le B,\;
+\tau \text{ deterministic and prefix-emitting}
+\big\}.
+\label{eq:feasible}
+\end{equation}
+Each tokenizer $\tau \in \mathcal{T}_{\mathrm{drop}}(B)$ induces a pair $(R(\tau), \Delta(\tau))$, representing its interface efficiency and irrecoverable semantic loss.
+
+The resulting \emph{rate--semantic distortion frontier}
+\begin{equation}
+\mathcal{F}(B)
+\;\triangleq\;
+\big\{
+(R(\tau), \Delta(\tau)) :
+\tau \in \mathcal{T}_{\mathrm{drop}}(B)
+\big\}
+\label{eq:frontier}
+\end{equation}
+characterizes the fundamental trade-off imposed by the interface under a fixed vocabulary budget.
+Lowering $R(\tau)$ increases usable context and reduces compute, while excessive compression necessarily increases $\Delta(\tau)$ by collapsing task-relevant distinctions at the prefix level.
+This mirrors classical rate--distortion trade-offs in lossy compression~\cite{shannon1948mathematical,cover1999elements}, with the crucial difference that distortion here is task-aligned and prefix-sensitive rather than reconstruction-based.
+
+Rather than treating tokenization as a heuristic preprocessing choice, we view interface design as selecting an operating point on $\mathcal{F}(B)$.
+The next section develops a deployment-aligned method for constructing tokenizers that improve this trade-off under deterministic, prefix-emitting execution semantics.
+
+\section{Method}
+\label{sec:method}
+
+We now present \emph{Controlled Interface Tokenization (CIT)}, a deployment-aligned tokenization system designed to improve the rate--distortion trade-off under strict drop-in constraints.
+CIT operationalizes the interface perspective developed in Section~\ref{sec:formulation} by combining an explicit interface contract, a deterministic execution model, and a vocabulary construction procedure aligned with deployed behavior.
+
+\subsection{Interface Contract}
+\label{sec:contract}
+
+CIT is defined with respect to an explicit \emph{interface contract} that specifies which segmentations are semantically admissible.
+The contract constrains the tokenization space to prevent interface-induced semantic collapse before any vocabulary induction is performed.
+
+\paragraph{Role-explicit boundaries.}
+Structured and semi-structured records encode semantics through explicit roles, such as field names, delimiters, and separators.
+The interface contract declares a set of role boundaries that tokenization is not permitted to cross.
+This prevents merges that conflate distinct semantic roles, such as key--value separators or field terminators.
+
+\paragraph{Typed-value integrity.}
+Many structured domains contain high-cardinality values (e.g., identifiers, timestamps, addresses) whose internal character structure is not semantically meaningful but whose integrity is role-critical.
+The contract specifies a set of typed-value classes and enforces their atomicity: typed values are treated as indivisible units, and neither segmentation nor vocabulary induction may split them.
+This constraint prevents interface collapse caused by fragmenting unstable value instances.
+
+Together, these constraints define a contract-feasible space of tokenizations that preserve role semantics and value integrity by construction.
+All tokenizers evaluated under CIT share the same contract, ensuring that comparisons isolate the effect of vocabulary construction rather than upstream preprocessing.
+
+\subsection{Deterministic Prefix-Emitting Execution}
+\label{sec:execution}
+
+CIT adopts a deterministic, prefix-emitting execution model.
+Given a contract-transformed input string, token emission proceeds left-to-right and never revises past decisions.
+At each position, the tokenizer emits the longest contract-feasible substring present in the vocabulary; if none exists, a fallback atomic unit (character or byte) is emitted.
+
+This execution model satisfies two deployment-critical properties.
+First, it ensures that tokenized prefixes depend only on observed raw prefixes, aligning execution with the causal interface assumed in Section~\ref{sec:formulation}.
+Second, determinism guarantees reproducibility and allows quantities estimated during vocabulary construction to reflect true runtime behavior.
+Ties are resolved deterministically (e.g., by token identifier order), yielding a unique segmentation for each input.
+
+\subsection{Vocabulary Construction via Deployment-Aligned Compression Gain}
+\label{sec:construction}
+
+Starting from an atomic contract vocabulary $\mathcal{V}_0$, CIT constructs a vocabulary of size $B$ by iteratively adding contract-feasible tokens.
+Let $\tau_{\mathcal{V}}$ denote the tokenizer induced by vocabulary $\mathcal{V}$ under the deterministic execution policy described above.
+
+We quantify interface cost by the expected token length $R(\tau)=\mathbb{E}[|Z|]$.
+For a candidate token $c$ admissible under the interface contract, we define its \emph{compression gain} as
+\begin{equation}
+G(c;\mathcal{V})
+\;\triangleq\;
+R(\tau_{\mathcal{V}}) - R(\tau_{\mathcal{V}\cup\{c\}}),
+\label{eq:gain}
+\end{equation}
+that is, the reduction in expected token length when $c$ is added to the vocabulary and executed under deployed semantics.
+
+Unlike frequency-based criteria used in classical subword induction, $G(c;\mathcal{V})$ is evaluated under the same deterministic, prefix-emitting execution model used at inference.
+As a result, it directly reflects interface-level efficiency improvements rather than abstract substring statistics.
+
+\subsection{Greedy Construction under Interface Constraints}
+\label{sec:greedy}
+
+CIT expands the vocabulary by repeatedly selecting the contract-feasible token with the largest compression gain:
+\begin{equation}
+c_k
+\;\in\;
+\arg\max_{c \in \mathcal{C}(\mathcal{V}_k)}
+G(c;\mathcal{V}_k),
+\label{eq:greedy}
+\end{equation}
+where $\mathcal{C}(\mathcal{V}_k)$ denotes the set of contract-feasible candidates under the current vocabulary.
+The vocabulary is updated as $\mathcal{V}_{k+1} \leftarrow \mathcal{V}_k \cup \{c_k\}$ until the budget $B$ is reached.
+
+Directed semantic distortion is \emph{not} optimized inside the construction loop.
+Instead, CIT separates \emph{construction} from \emph{evaluation}: vocabulary induction is driven by deployment-aligned compression gain, while semantic fidelity is assessed post hoc using the distortion metric introduced in Section~\ref{sec:distortion}.
+This separation yields a predictable and reproducible construction procedure while enabling empirical rate--distortion analysis across tokenizers and budgets.
+
+\subsection{Execution Alignment and Deployment Properties}
+\label{sec:properties}
+
+A defining feature of CIT is \emph{execution alignment}: the same deterministic, prefix-emitting segmentation semantics are used during vocabulary construction and at deployment.
+This alignment ensures that marginal quantities estimated during construction correspond to actual runtime behavior.
+
+\begin{lemma}[Prefix invariance]
+\label{lem:prefix}
+Let $\tau_{\mathcal{V}}$ be the tokenizer induced by vocabulary $\mathcal{V}$ under deterministic, prefix-emitting execution.
+For any input string $X$ and prefix length $t$, the tokenized prefix $\tau_{\mathcal{V}}(X_{1:t})$ is independent of future characters $X_{t+1:}$.
+\end{lemma}
+
+Lemma~\ref{lem:prefix} follows directly from left-to-right, non-revising token emission and guarantees that tokenized prefixes observed during construction are identical to those observed at deployment.
+As a result, interface cost estimates and downstream evaluations are free from training--deployment mismatch.
+
+Finally, once the vocabulary $\mathcal{V}_B$ is fixed, the tokenizer $\tau_{\mathcal{V}_B}$ can be compiled into a deterministic finite-state matcher.
+This compilation eliminates dynamic control flow, guarantees linear-time execution, and produces a standalone artifact suitable for latency-sensitive systems.
+\section{Background}
+\label{sec:background}
+
+\subsection{Interface setting and drop-in constraints}
+\label{sec:bg_setting}
+
+We study tokenization as a fixed representation interface for supervised prediction on structured and
+semi-structured symbolic inputs.
+Each example originates from a structured record $r \in \mathcal{R}$, such as a tabular row, a key--value map,
+or a protocol/log event.
+To enable the use of encoder-only neural encoders, records are deterministically serialized into symbolic
+strings
+\begin{equation}
+X \;=\; s(r) \in \Sigma^\ast,
+\label{eq:bg_serialization}
+\end{equation}
+where $\Sigma$ is an alphabet of characters or bytes.
+This record-to-text practice is widely adopted to reuse sequence models for non-linguistic inputs, including
+tabular and semi-structured prediction pipelines~\cite{yin2020tabert,herzig2020tapas}.
+
+A tokenizer is a mapping $\tau : \Sigma^\ast \rightarrow \mathcal{V}^\ast$ over a finite vocabulary
+$\mathcal{V}$, producing a token sequence $Z = \tau(X)$.
+We focus on a strict \emph{drop-in regime} in which the downstream encoder architecture, optimization procedure,
+and training budget are fixed (e.g., a given Transformer encoder)~\cite{vaswani2017attention,devlin2019bert}.
+Under this regime, the tokenizer is the primary modifiable component, and its execution must be deterministic,
+reproducible, and compatible with deployment constraints.
+
+We assume \emph{prefix-emitting} execution: tokens are emitted left-to-right and never revised.
+For a raw prefix $X_{1:t}$, the observable tokenized prefix is
+\begin{equation}
+Z^{(t)} \;=\; \tau(X_{1:t}),
+\label{eq:bg_prefix}
+\end{equation}
+which is irrevocably determined by the prefix.
+This requirement models streaming and early-decision settings, and it induces a causal interface between the
+raw input stream and the model's available observations at inference time.
+
+In encoder-only Transformers, inference cost scales at least linearly—and often superlinearly—with token
+sequence length due to self-attention~\cite{vaswani2017attention,kaplan2020scaling}.
+Consequently, under small-model and low-latency constraints, tokenization directly controls effective context
+length, truncation behavior, and compute allocation.
+This makes the tokenization interface a first-order bottleneck for both efficiency and accuracy in structured
+prediction systems.
+
+\subsection{Semantic prefix states and irreversibility of tokenization}
+\label{sec:bg_semantics}
+
+Prediction on structured inputs is inherently prefix-dependent.
+Let $Y$ denote task semantics (e.g., a class label), and let $\ell$ be the task loss (e.g., cross-entropy).
+For each raw prefix $X_{1:t}$, define the \emph{semantic prefix state} as the Bayes-optimal conditional
+distribution
+\begin{equation}
+\mathcal{S}(X_{1:t})
+\;\triangleq\;
+P^\star(\,\cdot \mid X_{1:t}),
+\label{eq:semantic_state_raw}
+\end{equation}
+which captures the strongest achievable semantics given direct access to the raw prefix.
+This notion parallels classical views of task-relevant information: $X_{1:t}$ contains a mixture of
+predictive signal and nuisance variation, and the semantic state represents exactly what matters for prediction
+under the chosen loss~\cite{tishby2000information,cover1999elements}.
+
+Tokenization restricts access to the raw input by exposing only the tokenized prefix
+$Z^{(t)} = \tau(X_{1:t})$.
+To formalize what is achievable through the interface, fix a reference predictor family $\mathcal{Q}$ whose
+members map tokenized prefixes to predictive distributions over $Y$.
+Define the best token-observing semantics at time $t$ as
+\begin{equation}
+q^\star_\tau(\,\cdot \mid Z^{(t)})
+\;\in\;
+\arg\min_{q \in \mathcal{Q}}
+\;
+\mathbb{E}\!\left[\ell\!\left(q(\,\cdot \mid Z^{(t)}), Y\right)\right],
+\label{eq:semantic_state_token}
+\end{equation}
+and let $\mathcal{S}_\tau(Z^{(t)}) \triangleq q^\star_\tau(\,\cdot \mid Z^{(t)})$.
+
+Because $\tau$ is deterministic and prefix-emitting, the mapping $X_{1:t} \mapsto Z^{(t)}$ is generally many-to-one.
+Distinct raw prefixes can therefore induce the same observable token prefix, forcing any token-observing
+predictor to average over their semantics.
+This identifies an \emph{irreversibility} at the interface: once two raw prefixes collapse to the same
+$Z^{(t)}$, no downstream encoder-only model can distinguish them without changing the interface.
+In structured settings, this collapse can occur when segmentation crosses role boundaries or fragments
+high-cardinality values whose internal characters are not semantically meaningful but whose integrity is
+role-critical~\cite{yin2020tabert,herzig2020tapas}.
+The interface-design problem is thus not merely compression, but compression that preserves task-relevant
+distinctions needed for prediction from prefixes.
+
+\subsection{Directed semantic distortion}
+\label{sec:bg_distortion}
+
+We quantify irrecoverable semantic loss induced by tokenization through a prefix-aligned, directed distortion.
+Intuitively, distortion measures how much semantic resolution is lost when one must predict from
+$Z^{(t)}$ rather than directly from $X_{1:t}$.
+
+Let $\mathcal{R}^\star(t)$ denote the Bayes risk at prefix length $t$,
+\begin{equation}
+\mathcal{R}^\star(t)
+\;\triangleq\;
+\mathbb{E}\!\left[\ell\!\left(\mathcal{S}(X_{1:t}), Y\right)\right],
+\label{eq:bayes_risk_raw}
+\end{equation}
+and let $\mathcal{R}_\tau(t)$ denote the best achievable risk given only the tokenized prefix,
+\begin{equation}
+\mathcal{R}_\tau(t)
+\;\triangleq\;
+\min_{q \in \mathcal{Q}}
+\mathbb{E}\!\left[\ell\!\left(q(\,\cdot \mid Z^{(t)}), Y\right)\right].
+\label{eq:bayes_risk_tok}
+\end{equation}
+The directed (raw $\rightarrow$ tokenized) semantic distortion of $\tau$ is defined as the average excess risk
+over prefix lengths:
+\begin{equation}
+\Delta(\tau)
+\;\triangleq\;
+\mathbb{E}\!\left[
+\frac{1}{T}\sum_{t=1}^{T}
+\big(\mathcal{R}_\tau(t) - \mathcal{R}^\star(t)\big)
+\right].
+\label{eq:semantic_distortion}
+\end{equation}
+
+This definition makes three aspects explicit.
+First, $\Delta(\tau)\ge 0$ by construction: restricting observations from $X_{1:t}$ to $Z^{(t)}$ cannot improve
+the best achievable risk under the same loss.
+Second, $\Delta(\tau)$ is an \emph{interface property}: it depends on what information $\tau$ preserves about
+prefixes, and it upper-bounds the performance one can obtain from any downstream encoder-only model without
+changing the interface.
+Third, the prefix averaging penalizes interfaces that delay task-relevant information to later tokens, which is
+critical under truncation and token-budget constraints.
+
+
+Operationally, $\Delta(\tau)$ can be estimated using a teacher--student construction: a teacher captures reference semantics from raw prefixes, while a student is restricted to tokenized prefixes. In our experiments, we use lightweight surrogate predictors to estimate this gap \emph{for evaluation}, avoiding full-scale training so that the metric reflects interface-induced information loss rather than representation adaptation. This viewpoint aligns with the use of KL or cross-entropy gaps as measures of irrecoverable information loss in distillation-style settings~\cite{hinton2015distilling} and connects to information-theoretic perspectives on task-relevant compression~\cite{tishby2000information,cover1999elements}.
+
+\subsection{Rate--distortion frontier under drop-in constraints}
+\label{sec:bg_frontier}
+
+Tokenization induces an interface-level compression of the raw input prior to learning.
+We quantify interface cost by the expected token length
+\begin{equation}
+R(\tau) \;\triangleq\; \mathbb{E}[|Z|],
+\label{eq:rate_def}
+\end{equation}
+which directly controls effective context length and inference cost in encoder-only models.
+
+Let $B$ denote a vocabulary budget, and define the drop-in feasible set
+\begin{equation}
+\mathcal{T}_{\mathrm{drop}}(B)
+\;=\;
+\big\{
+\tau \;\big|\;
+|\mathcal{V}| \le B,\;
+\tau \text{ deterministic and prefix-emitting}
+\big\}.
+\label{eq:dropin_set}
+\end{equation}
+Each feasible tokenizer $\tau \in \mathcal{T}_{\mathrm{drop}}(B)$ induces a pair $(R(\tau), \Delta(\tau))$,
+representing its efficiency and irrecoverable semantic loss.
+
+We define the \emph{rate--semantic distortion frontier}
+\begin{equation}
+\mathcal{F}(B)
+\;\triangleq\;
+\big\{
+(R(\tau), \Delta(\tau)) :
+\tau \in \mathcal{T}_{\mathrm{drop}}(B)
+\big\},
+\label{eq:frontier}
+\end{equation}
+which characterizes the fundamental trade-off imposed by the interface under a fixed vocabulary budget.
+Lowering $R(\tau)$ increases usable context and reduces compute, while excessive compression necessarily
+increases $\Delta(\tau)$ by collapsing task-relevant distinctions at the prefix level.
+This mirrors classical rate--distortion trade-offs in lossy compression~\cite{shannon1948mathematical,cover1999elements,blahut2003computation,arimoto1972algorithm},
+with the crucial difference that our distortion is task-aligned and prefix-sensitive rather than based on
+reconstruction fidelity.
+
+Rather than treating tokenization as a heuristic preprocessing choice, we view interface design as selecting an
+operating point on $\mathcal{F}(B)$.
+A standard scalarization of this trade-off is given by the Lagrangian objective
+\begin{equation}
+\min_{\tau \in \mathcal{T}_{\mathrm{drop}}(B)}
+\;\;
+R(\tau) + \lambda\,\Delta(\tau),
+\label{eq:lagrangian_objective}
+\end{equation}
+where $\lambda \ge 0$ controls the relative importance of semantic fidelity.
+Directly optimizing~\eqref{eq:lagrangian_objective} is intractable due to the combinatorial nature of the
+feasible set and the dependence of $\Delta(\tau)$ on unobservable Bayes semantics.
+The next section develops a deployment-aligned relaxation and an algorithm that approximately optimizes this
+trade-off under deterministic, prefix-emitting execution semantics.
+
+\section{Algorithms}
+\label{sec:algorithms}
+
+This section develops a concrete procedure for constructing tokenization interfaces that improve the rate--semantic distortion trade-off under strict drop-in constraints.
+A central challenge is that the distortion term depends on Bayes-optimal semantics and is not directly computable.
+Rather than attempting to optimize distortion during vocabulary induction (which would be prohibitively expensive and sensitive to surrogate choices), we separate \emph{construction} from \emph{calibration}:
+CIT constructs a deterministic, contract-feasible tokenizer by maximizing compression efficiency within a constrained feasible set, and then uses surrogate directed semantic distortion to evaluate semantic fidelity and characterize empirical rate--distortion frontiers.
+This design yields a deployment-aligned algorithm with predictable runtime and reproducible artifacts.
+
+
+\subsection{Deployment-aligned distortion for interface evaluation}
+\label{sec:alg_relaxation}
+
+The directed semantic distortion $\Delta(\tau)$ depends on Bayes-optimal semantic states and is therefore not directly computable.
+We introduce a deployment-aligned surrogate that replaces Bayes semantics with restricted-capacity predictors trained on observable data.
+Let $\widehat{\mathcal{S}}(X_{1:t})$ and $\widehat{\mathcal{S}}_\tau(Z^{(t)})$ denote semantic states induced by such predictors when observing raw prefixes and tokenized prefixes, respectively.
+These predictors are intentionally lightweight so that differences reflect information preserved by the interface rather than model expressiveness.
+
+We define the surrogate semantic distortion
+\begin{equation}
+\widehat{\Delta}(\tau)
+\;\triangleq\;
+\mathbb{E}\!\left[
+\frac{1}{T}
+\sum_{t=1}^{T}
+\mathcal{L}\big(
+\widehat{\mathcal{S}}(X_{1:t}),
+\widehat{\mathcal{S}}_\tau(Z^{(t)})
+\big)
+\right],
+\label{eq:surrogate_distortion}
+\end{equation}
+where $\mathcal{L}$ is a discrepancy measure such as cross-entropy or KL divergence.
+In CIT, $\widehat{\Delta}(\tau)$ is used to \emph{evaluate and calibrate} semantic fidelity across tokenizers and vocabulary budgets, enabling empirical rate--distortion analysis under the same deterministic, prefix-emitting execution semantics used at deployment.
+
+
+\subsection{Contract-feasible candidates and compression gain}
+\label{sec:alg_marginal}
+
+CIT constructs tokenizers within a constrained feasible set induced by an explicit interface contract.
+The contract specifies (i) role-explicit boundary markers, and (ii) typed-value integrity constraints for high-cardinality fields (e.g., identifiers, timestamps, addresses), preventing merges that cross semantic roles or fragment values in semantically invalid ways.
+Let $\mathcal{V}_0$ denote the atomic contract vocabulary.
+
+Given a current vocabulary $\mathcal{V}$ and the induced deterministic, prefix-emitting tokenizer $\tau_{\mathcal{V}}$, consider adding a contract-feasible candidate token $c$ that respects all boundary and typing constraints.
+We quantify interface cost by expected token length $R(\tau)=\mathbb{E}[|Z|]$.
+The \emph{compression gain} of adding $c$ is defined as the reduction in expected token length under deployed execution:
+\begin{equation}
+G(c;\mathcal{V})
+\;\triangleq\;
+R(\tau_{\mathcal{V}}) - R(\tau_{\mathcal{V}\cup\{c\}}).
+\label{eq:gain_def}
+\end{equation}
+Unlike raw substring frequency used in classical subword induction, $G(c;\mathcal{V})$ is evaluated under the same prefix-emitting semantics used at deployment and respects contract constraints.
+
+\subsection{Greedy construction under interface constraints}
+\label{sec:alg_greedy}
+
+Starting from $\mathcal{V}_0$, CIT expands the vocabulary by repeatedly selecting the contract-feasible token that maximizes compression gain:
+\begin{equation}
+c_k
+\;\in\;
+\arg\max_{c \in \mathcal{C}(\mathcal{V}_k)}
+G(c;\mathcal{V}_k),
+\label{eq:alg_selection_gain}
+\end{equation}
+and updating $\mathcal{V}_{k+1}\leftarrow \mathcal{V}_k\cup\{c_k\}$ until $|\mathcal{V}_k|=B$.
+This yields a deterministic and deployment-aligned vocabulary construction procedure with predictable runtime.
+
+Directed semantic distortion is \emph{not} optimized inside the main construction loop.
+Instead, we compute $\widehat{\Delta}(\tau)$ offline to validate semantic fidelity and to map empirical rate--distortion operating points across tokenizers and budgets.
+Optionally, one may refine the greedy choice by re-ranking a small top-$K$ shortlist of candidates using $\widehat{\Delta}$; we use this only as an implementation detail when needed and report $\widehat{\Delta}$ primarily as an evaluation metric.
+
+\begin{algorithm}[t]
+\caption{Controlled Interface Tokenization (CIT)}
+\label{alg:cit}
+\begin{algorithmic}[1]
+\STATE \textbf{Input:} Training corpus $\mathcal{D}$, vocabulary budget $B$, interface contract $\mathcal{K}$
+\STATE \textbf{Initialize:} $\mathcal{V}_0 \leftarrow$ atomic contract vocabulary induced by $\mathcal{K}$
+\FOR{$k = 0$ \textbf{to} $B-|\mathcal{V}_0|-1$}
+    \STATE Construct contract-feasible candidate set $\mathcal{C}(\mathcal{V}_k)$
+    \FOR{each $c \in \mathcal{C}(\mathcal{V}_k)$}
+        \STATE Estimate compression gain $G(c;\mathcal{V}_k)$ under deployed execution (Eq.~\eqref{eq:gain_def})
+    \ENDFOR
+    \STATE Select $c_k$ using Eq.~\eqref{eq:alg_selection_gain}
+    \STATE Update $\mathcal{V}_{k+1} \leftarrow \mathcal{V}_k \cup \{c_k\}$
+\ENDFOR
+\STATE \textbf{Output:} Vocabulary $\mathcal{V}_B$ and tokenizer $\tau_{\mathcal{V}_B}$
+\end{algorithmic}
+\end{algorithm}
+
+
+\subsection{Execution alignment and deployment properties}
+\label{sec:alg_execution}
+
+A defining feature of CIT is execution alignment: the same deterministic, prefix-emitting segmentation semantics
+are used during vocabulary construction and at inference.
+This ensures that marginal quantities estimated during optimization reflect true runtime behavior.
+
+\begin{lemma}[Prefix invariance]
+\label{lem:prefix_invariance}
+Let $\tau_{\mathcal{V}}$ be the tokenizer induced by vocabulary $\mathcal{V}$ under deterministic,
+prefix-emitting execution.
+For any input string $X$ and prefix length $t$, the tokenized prefix $\tau_{\mathcal{V}}(X_{1:t})$ is
+independent of future characters $X_{t+1:}$.
+\end{lemma}
+
+\begin{proof}
+Token emission proceeds left-to-right and never revises past decisions.
+Therefore, at position $t$, emitted tokens depend only on $X_{1:t}$ and $\mathcal{V}$.
+\end{proof}
+
+Lemma~\ref{lem:prefix_invariance} implies that tokenized prefixes observed during construction are identical to
+those observed at deployment.
+As a result, $\widehat{\mathcal{J}}_\lambda$ is a deployment-aligned objective rather than a training-time
+artifact.
+
+Finally, once the vocabulary $\mathcal{V}_B$ is fixed, the tokenizer $\tau_{\mathcal{V}_B}$ can be compiled into
+a deterministic finite-state transducer.
+This compilation eliminates dynamic control flow, guarantees linear-time execution, and produces a standalone
+artifact suitable for latency-sensitive systems.
+
+\subsection{Interface properties and algorithmic guarantees}
+\label{sec:alg_properties}
+
+We now formalize two properties that clarify the role of the tokenization interface and the behavior of
+the greedy construction procedure.
+The first establishes that information loss induced by the interface is fundamentally irrecoverable by
+any downstream encoder-only model.
+The second shows that the proposed greedy algorithm is consistent with the deployment-aligned objective
+introduced in Section~\ref{sec:bg_frontier}.
+
+\begin{proposition}[Irrecoverability of interface-induced prefix collapse]
+\label{prop:irrecoverability}
+Let $\tau$ be a deterministic, prefix-emitting tokenizer, and let
+$X_{1:t}$ and $X'_{1:t}$ be two raw prefixes such that
+\[
+\tau(X_{1:t}) = \tau(X'_{1:t}) = Z^{(t)}.
+\]
+Then, for any token-observing predictor $q \in \mathcal{Q}$ and any task loss $\ell$,
+the predictive distribution conditioned on the interface must coincide:
+\[
+q(\,\cdot \mid Z^{(t)}) \text{ is identical for both prefixes.}
+\]
+Consequently, if the Bayes-optimal semantic states differ,
+$\mathcal{S}(X_{1:t}) \neq \mathcal{S}(X'_{1:t})$,
+then the excess Bayes risk induced by the interface at prefix length $t$ is strictly positive.
+\end{proposition}
+
+Proposition~\ref{prop:irrecoverability} makes explicit that semantic distinctions collapsed by the
+tokenization interface cannot be recovered by any downstream encoder-only model without modifying the
+interface itself.
+This property underlies the definition of directed semantic distortion in
+Section~\ref{sec:bg_distortion} and motivates optimizing tokenization as an interface-level design problem
+rather than relying on downstream model capacity.
+
+\begin{proposition}[Monotonic descent under deployment-aligned greedy construction]
+\label{prop:greedy_descent}
+Let $\widehat{\mathcal{J}}_\lambda$ denote the relaxed interface objective defined in
+Eq.~\eqref{eq:relaxed_objective}, and let
+$\{\mathcal{V}_k\}_{k \ge 0}$ be the sequence of vocabularies produced by
+Algorithm~\ref{alg:cit} under fixed deterministic, prefix-emitting execution semantics.
+Then the relaxed objective is non-increasing along the construction path:
+\[
+\widehat{\mathcal{J}}_\lambda(\tau_{\mathcal{V}_{k+1}})
+\;\le\;
+\widehat{\mathcal{J}}_\lambda(\tau_{\mathcal{V}_{k}})
+\quad \text{for all } k.
+\]
+\end{proposition}
+
+Proposition~\ref{prop:greedy_descent} establishes that the greedy selection rule used by CIT performs a
+consistent local descent on the deployment-aligned objective.
+While global optimality is not guaranteed due to non-submodularity and interaction effects between tokens,
+this property distinguishes CIT from frequency-driven heuristics that lack an explicit interface-level
+objective.
+
+\section{Experiments}
+\label{sec:experiments}
+
+We re-anchor the empirical evaluation around three effect experiments that trace a causal chain from interface behavior to learning dynamics to system-level outcomes:
+\textbf{E1} asks whether prefix-emitting tokenization induces semantic collapse and whether CIT prevents it;
+\textbf{E2} asks whether preventing collapse makes end-to-end learning more sample-efficient and stable under a fixed token budget;
+\textbf{E3} asks whether these interface gains translate into better accuracy--latency trade-offs under fully trained encoder models.
+Across experiments, we keep the serialization schema, model architecture family, and optimizer settings fixed, varying only the tokenization interface.
+
+\subsection{Experimental protocol}
+\label{sec:exp_protocol}
+
+\paragraph{Datasets and serialization.}
+All inputs originate from structured or semi-structured records and are deterministically
+serialized into symbolic strings using a fixed schema shared across all tokenizers.
+We report results on (i) a synthetic structured prefix task designed to stress role/boundary dependence and semantics-preserving drift,
+(ii) CSIC 2010 HTTP anomaly detection (public, structured, and drift-prone),
+and (iii) OpenML Adult for an end-to-end accuracy/latency Pareto slice.
+(Additional public tabular benchmarks and vocabulary sweeps are deferred to the appendix.)
+
+\paragraph{Tokenizers.}
+We compare CIT against standard frequency-driven tokenizers:
+BPE~\cite{sennrich2016neural}, WordPiece~\cite{schuster2012japanese}, and
+Unigram~\cite{kudo2018subword}, all trained on the same data and constrained to the same
+vocabulary budget ($|\mathcal{V}|{=}2048$).
+All tokenizers are deterministic and prefix-emitting.
+
+\paragraph{Training budgets and models.}
+We match training compute using token-fair budgets: each run processes the same number of non-padding encoder tokens under a shared maximum sequence length and truncation policy.
+E1 uses a tiny encoder and a 3M-token budget ($L_{\max}{=}128$) to isolate interface failure modes.
+E2 trains end-to-end Tiny/Small encoders on CSIC under a 10M-token budget ($L_{\max}{=}512$), and also reports a step-fair control with matched optimizer steps.
+E3 trains end-to-end encoder families on Adult under a 5M-token budget ($L_{\max}{=}512$) and measures inference latency.
+
+\paragraph{Metrics.}
+We report average token length (\emph{rate}), tail token length (95th percentile),
+surrogate directed semantic distortion $\widehat{\Delta}(\tau)$,
+classification accuracy, robustness under semantics-preserving re-serialization drift,
+and, where applicable, end-to-end inference latency (95th percentile).
+
+\subsection{E1: Does CIT Prevent Prefix Semantic Collapse?}
+\label{sec:exp_e1}
+
+E1 isolates interface correctness in a controlled synthetic setting.
+We construct structured records whose labels depend on a role-specific signal placed mid-record, while other fields contain high-cardinality values and boundary-bearing markers.
+We evaluate (i) surrogate directed semantic distortion (prefix-level information loss) and (ii) robustness under semantics-preserving re-serializations (field shuffling, whitespace/number-format normalization, and insertion of irrelevant dummy fields).
+
+Semantic collapse is not hypothetical: with BPE/WordPiece/Unigram, test accuracy collapses to near chance on this task (4.5--5.6\% for 20-way classification), consistent with role-dependent prefixes becoming indistinguishable under the interface.
+In contrast, CIT prevents collapse and attains 100\% test accuracy.
+The interface diagnostics agree: CIT reduces surrogate distortion from 0.67--0.75 (baselines) to 0.295, and compresses the token rate from 645--692 tokens/example (baselines) to 81 tokens/example.
+Under semantics-preserving drift, baselines remain near chance (3.4--5.3\% drift accuracy), while CIT retains 85.4\% accuracy.
+
+This experiment validates directed semantic distortion as an interface-level metric:
+tokenizers with lower $\widehat{\Delta}(\tau)$ exhibit markedly improved drift robustness, even under compute-matched training.
+
+\subsection{E2: Token-Fair End-to-End Learning on CSIC 2010}
+\label{sec:exp_e2}
+
+E2 tests the learning benefit of avoiding collapse under a strict compute budget.
+We train Tiny/Small encoder models end-to-end on CSIC 2010 HTTP anomaly detection under a fixed token-fair budget of 10M encoder tokens.
+We also evaluate drift robustness under realistic, semantics-preserving re-serialization: reordering record-aware key--value groups and normalizing whitespace.
+
+Under token-fair training, CIT is substantially more efficient (217 avg.\ tokens/example, P95 416) than BPE/WordPiece (\(\sim\)327--329 avg., P95 514--526) and Unigram (406 avg., P95 595).
+This efficiency translates into more parameter updates under the same token budget (e.g., 1425 steps for CIT vs.\ \(\sim\)950 for BPE/WordPiece in our setup), and faster convergence in tokens: for Tiny models, CIT reaches 0.88 validation accuracy after 2.4M tokens, whereas BPE/WordPiece require \(\sim\)9M tokens to reach the same level.
+In final test accuracy, CIT achieves 91.2\% on Tiny models (vs.\ 89.0\% WordPiece, 85.3\% BPE), and remains competitive on Small models (90.1\% vs.\ 90.3--90.5\% for BPE/WordPiece).
+
+Robustness reveals the interface effect most clearly: under drift, CIT retains its performance (drift accuracy equals in-distribution accuracy), while BPE/WordPiece suffer catastrophic drops (e.g., 49.6\% and 46.9\% drift accuracy for Tiny; 47.9\% and 51.1\% for Small).
+Unigram is comparatively robust but substantially less efficient and less accurate under the same token budget.
+A step-fair control with matched optimizer steps preserves CIT's drift robustness while attenuating accuracy differences, consistent with robustness arising from interface correctness and accuracy gains under token-fair training arising from better token efficiency.
+
+\subsection{E3: End-to-End Accuracy--Latency Trade-offs}
+\label{sec:exp_e3}
+
+E3 closes the loop at the system level by measuring whether CIT shifts the end-to-end accuracy/latency trade-off under fully trained models.
+On OpenML Adult, we train each (tokenizer, model family) pair end-to-end under a fixed token budget (5M encoder tokens) and measure average/P95 sequence lengths and P95 forward-pass latency.
+
+CIT reduces average sequence length from \(\sim\)106 tokens (BPE/WordPiece) to 60.5 tokens (P95 69), yielding a consistent latency reduction.
+For the Mini model family, CIT attains 0.849 accuracy with 1.15ms P95 latency, compared to 0.843/1.35ms for BPE and 0.850/1.36ms for WordPiece.
+For the Small family, CIT matches WordPiece accuracy (0.761) while reducing P95 latency from 3.64ms to 2.52ms.
+Overall, CIT provides improved operating points on the accuracy--latency Pareto frontier by simultaneously reducing interface cost and preserving task-relevant prefix information (lower surrogate distortion than both baselines).
+
+\subsection{Summary}
+\label{sec:exp_summary}
+
+Across E1--E3, we observe a consistent chain: semantic collapse is real under prefix-emitting interfaces; CIT prevents collapse by enforcing role- and type-aware interface constraints; this improves end-to-end learning under token-fair budgets and yields better accuracy--latency trade-offs under fully trained encoder models.
+Additional vocabulary sweeps and public tabular benchmarks are provided in the appendix.
+
+
+\section{Discussion}
+\label{sec:discussion}
+
+Our results support the view that tokenization for domain-specific prediction should prioritize specialization over generality.
+On structured inputs, frequency-driven compression alone is insufficient and can actively harm task performance by conflating semantic roles.
+CIT demonstrates that enforcing interface constraints and aligning vocabulary induction with task semantics yields more efficient and robust representations, particularly for small encoder-only models.
+
+
+\section{Conclusion}
+\label{sec:conclusion}
+
+We formulated tokenization as controlled interface compression under a drop-in regime and introduced directed semantic distortion as a principled interface metric.
+We proposed Controlled Interface Tokenization, aligning feasible constraints, vocabulary induction, and deterministic execution.
+Across synthetic and public structured benchmarks, CIT improves rate--distortion trade-offs, downstream accuracy under matched training budgets, and robustness to re-serialization and prefix-limited prediction.
+
+\section*{Impact Statement}
+
+This work improves efficiency and robustness in structured prediction pipelines under fixed compute budgets.
+Applications should follow responsible data handling and privacy-preserving practices.

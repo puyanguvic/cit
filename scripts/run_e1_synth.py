@@ -17,7 +17,12 @@ from cit.tokenizers.runtime import tokenize_longest_match
 from cit.models.encoder import TinyEncoder
 from cit.models.train import train_compute_matched
 from cit.models.eval import evaluate
-from cit.tokenizers.metrics import DistortionCfg, estimate_surrogate_distortion, estimate_rate
+from cit.tokenizers.metrics import (
+    DistortionCfg,
+    estimate_prefix_oracle_accuracy_split,
+    estimate_surrogate_distortion,
+    estimate_rate,
+)
 
 
 def _token_label_purity(token_seqs, labels, min_count: int = 20, topk: int = 50):
@@ -54,8 +59,18 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--outdir", type=str, default="runs/e1_synth")
     ap.add_argument("--vocab", type=int, default=2048)
+    ap.add_argument("--max-len", type=int, default=128)
+    ap.add_argument("--total-tokens", type=int, default=3_000_000)
+    ap.add_argument("--batch-size", type=int, default=64)
+    ap.add_argument("--lr", type=float, default=3e-4)
     ap.add_argument("--device", type=str, default="cuda")
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument(
+        "--n-drift-samples",
+        type=int,
+        default=200,
+        help="Number of test examples to sample for drift evaluation (each expanded into multiple variants).",
+    )
     args = ap.parse_args()
 
     set_seed(args.seed)
@@ -103,7 +118,7 @@ def main():
     save_vocab_json(cit_art, tok_dir / "cit" / "vocab.json")
     save_json(cit_contract, tok_dir / "cit" / "contract.json")
 
-    # interface metrics (rate + surrogate distortion)
+    # interface metrics (rate + surrogate distortion + oracle prefix predictability)
     dcfg = DistortionCfg(sample_size=2000, seed=args.seed, show_progress=True)
 
     runs = []
@@ -129,12 +144,21 @@ def main():
             w.writeheader()
             w.writerows(purity)
         pad_id = 0
-        max_len = 128
-        total_tokens = 3_000_000  # match
+        max_len = int(args.max_len)
+        total_tokens = int(args.total_tokens)  # match
         train_ds = list(zip(tr_ids, ytr))
         test_ds  = list(zip(te_ids, yte))
         model = TinyEncoder(vocab_size=args.vocab, n_classes=n_classes)
-        model = train_compute_matched(model, train_ds, pad_id, max_len, total_tokens, device=args.device)
+        model = train_compute_matched(
+            model,
+            train_ds,
+            pad_id,
+            max_len,
+            total_tokens,
+            device=args.device,
+            batch_size=int(args.batch_size),
+            lr=float(args.lr),
+        )
         acc = evaluate(model, test_ds, pad_id, max_len, device=args.device)
 
         rate = estimate_rate(te_ids)
@@ -146,20 +170,40 @@ def main():
             base_tok = {"BPE": bpe, "WordPiece": wp, "Unigram": uni}[name]
             enc_pref = lambda s, _tok=base_tok: _tok.encode(s).ids
         dist = estimate_surrogate_distortion(Xtr, ytr, encode_prefix=enc_pref, vocab_size=args.vocab, cfg=dcfg)
+        oracle_acc = estimate_prefix_oracle_accuracy_split(
+            Xtr,
+            ytr,
+            Xte,
+            yte,
+            encode_prefix=enc_pref,
+            cfg=dcfg,
+        )
 
         # robustness: average over variants
         drift_accs = []
+        drift_texts = []
+        drift_labels = []
         for i in tqdm(
-            range(200),
+            range(min(args.n_drift_samples, len(Xte))),
             desc=f"drift_{name}",
             leave=False,
             disable=not sys.stderr.isatty(),
         ):  # sample for speed
             vs = make_variants(Xte[i], seed=i)
+            drift_texts.extend(vs)
+            drift_labels.extend([yte[i]] * len(vs))
             v_ids = enc(vs)
             v_ds = list(zip(v_ids, [yte[i]]*len(vs)))
             drift_accs.append(evaluate(model, v_ds, pad_id, max_len, device=args.device))
         drift_acc = sum(drift_accs) / len(drift_accs)
+        oracle_drift_acc = estimate_prefix_oracle_accuracy_split(
+            Xtr,
+            ytr,
+            drift_texts,
+            drift_labels,
+            encode_prefix=enc_pref,
+            cfg=dcfg,
+        )
         runs.append(
             {
                 "tokenizer": name,
@@ -167,6 +211,8 @@ def main():
                 "drift_acc": float(drift_acc),
                 "rate_E_len": float(rate),
                 "distortion_hat": float(dist),
+                "oracle_acc": float(oracle_acc),
+                "oracle_drift_acc": float(oracle_drift_acc),
                 "seed": int(args.seed),
                 "vocab": int(args.vocab),
             }
