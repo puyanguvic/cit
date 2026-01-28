@@ -12,16 +12,16 @@
     {
       "tokenizer": "WordPiece",
       "test_acc": 0.045,
-      "drift_acc": 0.046000000000000006,
-      "rate_E_len": 648.1055,
-      "distortion_hat": 0.6685781915161041,
+      "drift_acc": 0.034,
+      "rate_E_len": 648.1305,
+      "distortion_hat": 0.6728220863491753,
       "seed": 0,
       "vocab": 2048
     },
     {
       "tokenizer": "Unigram",
       "test_acc": 0.0555,
-      "drift_acc": 0.052000000000000005,
+      "drift_acc": 0.053,
       "rate_E_len": 691.717,
       "distortion_hat": 0.6669006265470748,
       "seed": 0,

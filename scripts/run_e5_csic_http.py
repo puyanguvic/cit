@@ -64,6 +64,66 @@ def make_model(kind: str, vocab_size: int, n_classes: int, max_len: int):
     raise ValueError(f"Unknown model kind: {kind}")
 
 
+def _parse_budget_modes(s: str) -> List[str]:
+    modes: List[str] = []
+    for part in s.split(","):
+        key = part.strip().lower()
+        if not key:
+            continue
+        if key in {"token", "token_fair", "token-fair"}:
+            norm = "token_fair"
+        elif key in {"step", "step_fair", "step-fair"}:
+            norm = "step_fair"
+        else:
+            raise ValueError(f"Unknown budget mode: {part}")
+        if norm not in modes:
+            modes.append(norm)
+    if not modes:
+        raise ValueError("Empty --budget-modes list")
+    return modes
+
+
+def _avg_trunc_len(ids: List[List[int]], max_len: int) -> float:
+    if not ids:
+        return 0.0
+    total = 0
+    for s in ids:
+        total += min(len(s), max_len)
+    return float(total) / float(len(ids))
+
+
+def _pareto_frontier(points: List[dict], *, x_key: str, y_key: str) -> List[dict]:
+    """Return non-dominated points for minimizing x and maximizing y."""
+    pts = sorted(points, key=lambda d: (float(d[x_key]), -float(d[y_key])))
+    frontier: List[dict] = []
+    best_y = float("-inf")
+    for d in pts:
+        y = float(d[y_key])
+        if y > best_y:
+            frontier.append(d)
+            best_y = y
+    return frontier
+
+
+def _write_curves(curve_rows: List[dict], out_path: Path) -> None:
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    with out_path.open("w", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(["seen_tokens", "seen_steps", "train_loss", "train_acc", "val_acc", "wall_s", "lr"])
+        for r in curve_rows:
+            w.writerow(
+                [
+                    int(r.get("seen_tokens", 0)),
+                    int(r.get("seen_steps", 0)),
+                    float(r.get("train_loss", float("nan"))),
+                    float(r.get("train_acc", float("nan"))),
+                    float(r.get("val_acc", float("nan"))),
+                    float(r.get("wall_s", float("nan"))),
+                    float(r.get("lr", float("nan"))),
+                ]
+            )
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--data-dir", type=str, required=True, help="Directory containing CSIC 2010 raw files")
@@ -81,12 +141,26 @@ def main():
         default=10_000_000,
         help="Encoder-token budget per (tokenizer, model) run (token-fair training).",
     )
+    ap.add_argument(
+        "--budget-modes",
+        type=str,
+        default="token,step",
+        help="Comma-separated budget modes to run: token,step",
+    )
+    ap.add_argument(
+        "--step-fair-steps",
+        type=int,
+        default=0,
+        help="If >0, optimizer steps for step-fair runs. If 0, derive from token budget + BPE avg length.",
+    )
     ap.add_argument("--batch-size", type=int, default=32)
     ap.add_argument("--lr", type=float, default=3e-4)
     ap.add_argument("--grad-clip", type=float, default=1.0)
     ap.add_argument("--device", type=str, default="cuda")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--outdir", type=str, default="paper/e5_csic_http")
+    ap.add_argument("--plot", action="store_true", help="Run plot_frontier.py after saving CSVs.")
+    ap.add_argument("--plot-group-key", type=str, default="tokenizer", help="Grouping key for frontier plots.")
     ap.add_argument(
         "--include-raw",
         action="store_true",
@@ -148,6 +222,13 @@ def main():
             counts[int(yy)] += 1
     total = max(1, sum(counts))
     class_weights = [float(total / max(1, c)) for c in counts]
+    majority_class = int(max(range(n_classes), key=lambda i: counts[i])) if n_classes > 0 else 0
+    majority_train_frac = float(max(counts) / total) if counts else 0.0
+    majority_test_acc = float(
+        sum(1 for yy in yte if int(yy) == majority_class) / max(1, len(yte))
+    )
+
+    budget_modes = _parse_budget_modes(args.budget_modes)
 
     # Train tokenizers on training serialization.
     bpe = train_bpe(Xtr, vocab_size=args.vocab)
@@ -188,75 +269,178 @@ def main():
 
     model_kinds = [m.strip() for m in args.models.split(",") if m.strip()]
 
-    rows = []
+    encoded = {}
+    for tok_name, enc in encoders:
+        tr_ids = enc(Xtr)
+        va_ids = enc(Xva)
+        te_ids = enc(Xte)
+        te_drift_ids = enc(Xte_drift)
+        encoded[tok_name] = {
+            "tr_ids": tr_ids,
+            "va_ids": va_ids,
+            "te_ids": te_ids,
+            "te_drift_ids": te_drift_ids,
+            "train_pairs": list(zip(tr_ids, ytr)),
+            "val_pairs": list(zip(va_ids, yva)),
+            "test_pairs": list(zip(te_ids, yte)),
+            "drift_pairs": list(zip(te_drift_ids, yte)),
+            "avg_len": float(estimate_rate(te_ids)),
+            "p95_len": int(sorted([len(s) for s in te_ids])[int(0.95 * len(te_ids))]),
+            "avg_len_train": float(_avg_trunc_len(tr_ids, args.max_len)),
+        }
+
+    step_budget = None
+    if "step_fair" in budget_modes:
+        if args.step_fair_steps > 0:
+            step_budget = int(args.step_fair_steps)
+        else:
+            ref_tok = "BPE" if "BPE" in encoded else list(encoded.keys())[0]
+            ref_len = max(1.0, encoded[ref_tok]["avg_len_train"])
+            tokens_per_step = max(1.0, ref_len * float(args.batch_size))
+            step_budget = max(1, int(args.total_tokens / tokens_per_step))
+        print(f"[step-fair] Using total_steps={step_budget}")
+
+    curves_root = outdir / "curves"
+    rows: List[dict] = []
+    rows_by_mode = {m: [] for m in budget_modes}
+
     for model_kind in model_kinds:
-        for tok_name, enc in encoders:
-            tr_ids = enc(Xtr)
-            va_ids = enc(Xva)
-            te_ids = enc(Xte)
-            te_drift_ids = enc(Xte_drift)
-
+        # Conservative LR scaling for larger models to avoid collapse.
+        lr_eff = float(args.lr)
+        if model_kind == "base":
+            lr_eff = min(lr_eff, 2e-4)
+        for tok_name, _ in encoders:
+            data = encoded[tok_name]
             pad_id = 0
-            train_pairs = list(zip(tr_ids, ytr))
-            val_pairs = list(zip(va_ids, yva))
-            test_pairs = list(zip(te_ids, yte))
-            drift_pairs = list(zip(te_drift_ids, yte))
+            train_pairs = data["train_pairs"]
+            val_pairs = data["val_pairs"]
+            test_pairs = data["test_pairs"]
+            drift_pairs = data["drift_pairs"]
 
-            model = make_model(model_kind, vocab_size=args.vocab, n_classes=n_classes, max_len=args.max_len)
+            for mode in budget_modes:
+                curve_rows: List[dict] = []
 
-            # Conservative LR scaling for larger models to avoid collapse.
-            lr_eff = float(args.lr)
-            if model_kind == "base":
-                lr_eff = min(lr_eff, 2e-4)
+                def _on_log(rec: dict):
+                    curve_rows.append(dict(rec))
 
-            log_path = outdir / "train_logs" / f"{model_kind}_{tok_name}.jsonl"
-            model = train_compute_matched(
-                model,
-                train_pairs,
-                pad_id,
-                args.max_len,
-                total_tokens=args.total_tokens,
-                device=args.device,
-                batch_size=args.batch_size,
-                lr=lr_eff,
-                probe_only=False,
-                grad_clip=float(args.grad_clip),
-                class_weights=class_weights,
-                warmup_tokens=max(50_000, int(args.total_tokens // 20)),
-                log_path=str(log_path),
-                eval_pairs=val_pairs,
-                eval_every_tokens=max(50_000, args.total_tokens // 50),
-            )
+                if mode == "token_fair":
+                    total_steps = None
+                    eval_every_tokens = max(50_000, args.total_tokens // 50)
+                    eval_every_steps = None
+                    warmup_tokens = max(50_000, int(args.total_tokens // 20))
+                    warmup_steps = 0
+                elif mode == "step_fair":
+                    if not step_budget:
+                        continue
+                    total_steps = int(step_budget)
+                    eval_every_tokens = max(50_000, args.total_tokens // 50)
+                    eval_every_steps = max(10, total_steps // 50)
+                    warmup_tokens = 0
+                    warmup_steps = min(total_steps, max(10, total_steps // 20))
+                else:
+                    raise ValueError(f"Unknown budget mode: {mode}")
 
-            acc = evaluate(model, test_pairs, pad_id, args.max_len, device=args.device)
-            drift_acc = evaluate(model, drift_pairs, pad_id, args.max_len, device=args.device)
+                model = make_model(model_kind, vocab_size=args.vocab, n_classes=n_classes, max_len=args.max_len)
 
-            avg_len = estimate_rate(te_ids)
-            p95 = sorted([len(s) for s in te_ids])[int(0.95 * len(te_ids))]
+                log_path = outdir / "train_logs" / f"{model_kind}_{tok_name}_{mode}.jsonl"
+                model = train_compute_matched(
+                    model,
+                    train_pairs,
+                    pad_id,
+                    args.max_len,
+                    total_tokens=args.total_tokens,
+                    total_steps=total_steps,
+                    device=args.device,
+                    batch_size=args.batch_size,
+                    lr=lr_eff,
+                    probe_only=False,
+                    grad_clip=float(args.grad_clip),
+                    class_weights=class_weights,
+                    warmup_tokens=warmup_tokens,
+                    warmup_steps=warmup_steps,
+                    log_path=str(log_path),
+                    eval_pairs=val_pairs,
+                    eval_every_tokens=eval_every_tokens,
+                    eval_every_steps=eval_every_steps,
+                    on_log=_on_log,
+                )
 
-            row = {
-                "dataset": "csic2010",
-                "model": model_kind,
-                "tokenizer": tok_name,
-                "acc": float(acc),
-                "drift_acc": float(drift_acc),
-                "avg_len": float(avg_len),
-                "p95_len": int(p95),
-                "vocab": int(args.vocab),
-                "max_len": int(args.max_len),
-                "total_tokens": int(args.total_tokens),
-                "seed": int(args.seed),
-            }
-            rows.append(row)
-            print(
-                f"csic2010\t{model_kind}\t{tok_name}\tacc={acc:.4f}\tdrift_acc={drift_acc:.4f}\tavg_len={avg_len:.1f}\tp95_len={p95}"
-            )
+                acc = evaluate(model, test_pairs, pad_id, args.max_len, device=args.device)
+                drift_acc = evaluate(model, drift_pairs, pad_id, args.max_len, device=args.device)
+
+                curves_path = curves_root / mode / f"curves_{model_kind}_{tok_name}.csv"
+                _write_curves(curve_rows, curves_path)
+
+                row = {
+                    "dataset": "csic2010",
+                    "model": model_kind,
+                    "tokenizer": tok_name,
+                    "budget_mode": mode,
+                    "acc": float(acc),
+                    "drift_acc": float(drift_acc),
+                    "avg_len": float(data["avg_len"]),
+                    "p95_len": int(data["p95_len"]),
+                    "vocab": int(args.vocab),
+                    "max_len": int(args.max_len),
+                    "total_tokens": int(args.total_tokens),
+                    "total_steps": int(total_steps or 0),
+                    "majority_train_frac": float(majority_train_frac),
+                    "majority_test_acc": float(majority_test_acc),
+                    "seed": int(args.seed),
+                }
+                rows.append(row)
+                rows_by_mode[mode].append(row)
+                print(
+                    f"csic2010\t{model_kind}\t{tok_name}\t{mode}\tacc={acc:.4f}\t"
+                    f"drift_acc={drift_acc:.4f}\tavg_len={data['avg_len']:.1f}\tp95_len={data['p95_len']}"
+                )
 
     with (outdir / "results.csv").open("w", newline="") as f:
         w = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
         w.writeheader()
         w.writerows(rows)
     save_json({"rows": rows}, outdir / "results.json")
+
+    for mode, mode_rows in rows_by_mode.items():
+        if not mode_rows:
+            continue
+        out_csv = outdir / f"results_{mode}.csv"
+        with out_csv.open("w", newline="") as f:
+            w = csv.DictWriter(f, fieldnames=list(mode_rows[0].keys()))
+            w.writeheader()
+            w.writerows(mode_rows)
+
+        frontier = _pareto_frontier(mode_rows, x_key="avg_len", y_key="acc")
+        out_f = outdir / f"frontier_{mode}.csv"
+        with out_f.open("w", newline="") as f:
+            w = csv.DictWriter(f, fieldnames=list(mode_rows[0].keys()))
+            w.writeheader()
+            w.writerows(frontier)
+        save_json({"frontier": frontier}, outdir / f"frontier_{mode}.json")
+
+    if args.plot:
+        script = Path(__file__).parent / "plot_frontier.py"
+        for mode, mode_rows in rows_by_mode.items():
+            if not mode_rows:
+                continue
+            try:
+                subprocess.check_call(
+                    [
+                        sys.executable,
+                        str(script),
+                        "--run_dir",
+                        str(outdir),
+                        "--results_csv",
+                        f"results_{mode}.csv",
+                        "--group_key",
+                        args.plot_group_key,
+                        "--prefix",
+                        mode,
+                    ]
+                )
+            except Exception as e:
+                print(f"[warn] plot_frontier failed for {mode}: {e}")
+
     print(f"[wrote] {outdir / 'results.csv'}")
 
 

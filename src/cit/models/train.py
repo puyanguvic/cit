@@ -54,6 +54,9 @@ def train_compute_matched(
     grad_clip: float = 1.0,
     class_weights: Optional[Sequence[float]] = None,
     warmup_tokens: int = 0,
+    total_steps: Optional[int] = None,
+    eval_every_steps: Optional[int] = None,
+    warmup_steps: int = 0,
     on_log: Optional[Callable[[dict], None]] = None,
     show_progress: bool = True,
     progress_desc: str = "train_model",
@@ -92,23 +95,33 @@ def train_compute_matched(
     import json
     import time
 
+    target_steps = int(total_steps) if total_steps and total_steps > 0 else None
+    if target_steps is not None and eval_every_steps is None:
+        eval_every_steps = max(1, target_steps // 50)
+
     seen_tokens = 0
-    last_eval_at = 0
+    seen_steps = 0
+    last_eval_at_tokens = 0
+    last_eval_at_steps = 0
     model.train()
     it = iter(dl)
     t0 = time.time()
     base_lr = lr
     if warmup_tokens and warmup_tokens > 0:
         warmup_tokens = int(warmup_tokens)
+    if warmup_steps and warmup_steps > 0:
+        warmup_steps = int(warmup_steps)
     pbar = None
-    if show_progress and total_tokens > 0:
-        pbar = tqdm(
-            total=total_tokens,
-            desc=progress_desc,
-            dynamic_ncols=True,
-            leave=True,
-            disable=not sys.stderr.isatty(),
-        )
+    if show_progress:
+        total_units = target_steps if target_steps is not None else total_tokens
+        if total_units > 0:
+            pbar = tqdm(
+                total=total_units,
+                desc=progress_desc,
+                dynamic_ncols=True,
+                leave=True,
+                disable=not sys.stderr.isatty(),
+            )
     prev_seen = 0
 
     def _emit(rec: dict):
@@ -118,7 +131,7 @@ def train_compute_matched(
             os.makedirs(os.path.dirname(log_path) or ".", exist_ok=True)
             with open(log_path, "a", encoding="utf-8") as f:
                 f.write(json.dumps(rec) + "\n")
-    while seen_tokens < total_tokens:
+    while (seen_steps < target_steps) if target_steps is not None else (seen_tokens < total_tokens):
         try:
             x, m, y = next(it)
         except StopIteration:
@@ -137,27 +150,37 @@ def train_compute_matched(
         if grad_clip is not None and grad_clip > 0:
             torch.nn.utils.clip_grad_norm_(params, max_norm=float(grad_clip))
 
-        # Simple token-based warmup to improve stability for larger models.
-        if warmup_tokens and warmup_tokens > 0:
+        # Simple warmup to improve stability for larger models.
+        if warmup_steps and warmup_steps > 0 and target_steps is not None:
+            scale = min(1.0, float(seen_steps + 1) / float(warmup_steps))
+            for pg in opt.param_groups:
+                pg["lr"] = base_lr * scale
+        elif warmup_tokens and warmup_tokens > 0:
             scale = min(1.0, float(seen_tokens + int(m.sum().item())) / float(warmup_tokens))
             for pg in opt.param_groups:
                 pg["lr"] = base_lr * scale
         opt.step()
 
         seen_tokens += int(m.sum().item())
+        seen_steps += 1
         if pbar is not None:
-            new_seen = min(seen_tokens, total_tokens)
+            new_seen = min(seen_steps, target_steps) if target_steps is not None else min(seen_tokens, total_tokens)
             pbar.update(new_seen - prev_seen)
             prev_seen = new_seen
 
         # Lightweight logging/evaluation (token-budget aligned).
         if log_path is not None or on_log is not None:
-            if seen_tokens - last_eval_at >= eval_every_tokens:
+            if target_steps is not None:
+                do_eval = seen_steps - last_eval_at_steps >= int(eval_every_steps or 1)
+            else:
+                do_eval = seen_tokens - last_eval_at_tokens >= eval_every_tokens
+            if do_eval:
                 with torch.no_grad():
                     pred = logits.argmax(dim=-1)
                     acc = float((pred == y).float().mean().item())
                 rec = {
                     "seen_tokens": int(seen_tokens),
+                    "seen_steps": int(seen_steps),
                     "train_loss": float(loss.item()),
                     "train_acc": acc,
                     "wall_s": float(time.time() - t0),
@@ -170,7 +193,10 @@ def train_compute_matched(
                         evaluate(model, eval_pairs, pad_id=pad_id, max_len=max_len, device=device)
                     )
                 _emit(rec)
-                last_eval_at = seen_tokens
+                if target_steps is not None:
+                    last_eval_at_steps = seen_steps
+                else:
+                    last_eval_at_tokens = seen_tokens
 
     if pbar is not None:
         pbar.close()

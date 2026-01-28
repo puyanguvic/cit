@@ -105,6 +105,8 @@ def main():
         e5_args = common + ["--data-dir", args.e5_data_dir, "--outdir", f"{args.outroot}/e5_csic_http"]
         if args.auto_download:
             e5_args.append("--auto-download")
+        if args.plot:
+            e5_args.append("--plot")
         run("run_e5_csic_http.py", e5_args)
 
     print("\n[OK] All requested experiments finished.")

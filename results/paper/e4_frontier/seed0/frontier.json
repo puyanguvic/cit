@@ -7,9 +7,9 @@
       "avg_len": 57.95291227351827,
       "p95_len": 60,
       "distortion_hat": 0.12288894244111097,
-      "tokenize_ms_per_sample": 2.610969004842142,
-      "encode_total_s": 133.0488362070173,
-      "train_time_s": 0.8400898696854711
+      "tokenize_ms_per_sample": 2.586331363146504,
+      "encode_total_s": 131.79088909644634,
+      "train_time_s": 0.938108111731708
     }
   ]
 }

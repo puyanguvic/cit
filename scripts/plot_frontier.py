@@ -69,12 +69,17 @@ def main():
     ap.add_argument("--run_dir", type=str, required=True, help="Run directory, e.g., results/e4_frontier/seed0")
     ap.add_argument("--results_csv", type=str, default="results.csv", help="CSV filename inside run_dir")
     ap.add_argument("--group_key", type=str, default="tokenizer", help="Grouping key for legend (default: tokenizer)")
+    ap.add_argument("--prefix", type=str, default="", help="Optional prefix for output filenames (e.g., token_fair)")
     args = ap.parse_args()
 
     run_dir = Path(args.run_dir)
     csv_path = run_dir / args.results_csv
     if not csv_path.exists():
         raise FileNotFoundError(f"Missing results CSV: {csv_path}")
+
+    prefix = args.prefix.strip()
+    if prefix and not prefix.endswith("_"):
+        prefix = prefix + "_"
 
     rows = read_rows(csv_path)
     groups = group_by(rows, args.group_key)
@@ -87,7 +92,7 @@ def main():
         title="Accuracy vs. Rate (avg token length)",
         xlabel="avg_len (tokens/sample)",
         ylabel="accuracy",
-        outpath=run_dir / "frontier_acc_vs_len",
+        outpath=run_dir / f"{prefix}frontier_acc_vs_len",
     )
 
     if any("distortion_hat" in r for r in rows):
@@ -98,7 +103,7 @@ def main():
             title="Accuracy vs. Surrogate Distortion",
             xlabel="distortion_hat (prefix KL surrogate)",
             ylabel="accuracy",
-            outpath=run_dir / "frontier_acc_vs_distortion",
+            outpath=run_dir / f"{prefix}frontier_acc_vs_distortion",
         )
         plot_scatter(
             groups,
@@ -107,7 +112,7 @@ def main():
             title="Rate vs. Surrogate Distortion",
             xlabel="distortion_hat (prefix KL surrogate)",
             ylabel="avg_len (tokens/sample)",
-            outpath=run_dir / "frontier_len_vs_distortion",
+            outpath=run_dir / f"{prefix}frontier_len_vs_distortion",
         )
 
     # Systems proxy plots (if present)
@@ -119,7 +124,7 @@ def main():
             title="Tokenization Time vs. Rate",
             xlabel="avg_len (tokens/sample)",
             ylabel="tokenize_ms_per_sample",
-            outpath=run_dir / "frontier_tokenize_ms_vs_len",
+            outpath=run_dir / f"{prefix}frontier_tokenize_ms_vs_len",
         )
 
     print(f"[OK] Wrote plots under: {run_dir}")
