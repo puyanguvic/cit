@@ -79,7 +79,7 @@ def _parse_query_params(qs: str) -> Dict[str, str]:
     return out
 
 
-def _parse_http_request(req: str, max_headers: int = 16) -> Dict[str, str]:
+def _parse_http_request(req: str, max_headers: int = 16, include_raw: bool = False) -> Dict[str, str]:
     """Best-effort HTTP request parser for tokenization research.
 
     The goal is not full RFC compliance; the goal is to extract stable
@@ -140,8 +140,12 @@ def _parse_http_request(req: str, max_headers: int = 16) -> Dict[str, str]:
         if hk in {"host", "user-agent", "content-type", "cookie", "referer"}:
             rec[f"h_{hk}"] = headers[hk]
 
-    # Keep the raw request as a fallback signal.
-    rec["raw"] = req
+    # Optionally include the raw request as a fallback signal.
+    # NOTE: For tokenizer-focused experiments we typically set include_raw=False
+    # so the task depends on structured field/value roles rather than memorizing
+    # long raw strings.
+    if include_raw:
+        rec["raw"] = req
     return rec
 
 
@@ -172,6 +176,7 @@ def load_csic2010_http(
     n_test: int = 5000,
     seed: int = 0,
     serialize_cfg: SerializeCfg | None = None,
+    include_raw: bool = False,
 ) -> Tuple[List[str], List[int], List[str], List[int], List[str], List[int]]:
     """Load + parse + serialize CSIC 2010 HTTP samples.
 
@@ -245,7 +250,7 @@ def load_csic2010_http(
         reqs = [texts[i] for i in indices]
         ys = [labels[i] for i in indices]
         if needs_parse:
-            recs = [_parse_http_request(r) for r in reqs]
+            recs = [_parse_http_request(r, include_raw=include_raw) for r in reqs]
             ser = serialize_iter(recs, serialize_cfg)
             return ser, ys
         return reqs, ys

@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import Callable, List, Tuple
 
 from cit.data.http_csic import load_csic2010_http
-from cit.data.drift import make_variants
+from cit.data.drift import drift_reorder_kv_groups, drift_whitespace
 from cit.tokenizers.metrics import estimate_rate
 from cit.tokenizers.hf_baselines import train_bpe, train_wordpiece, train_unigram
 from cit.tokenizers.cit_contract import Contract, apply_contract
@@ -39,13 +39,18 @@ def hf_encode(tok, texts: List[str]) -> List[List[int]]:
 
 
 def build_drift_texts(texts: List[str], seed: int) -> List[str]:
-    # Choose a single drift variant per example for a clean robustness slice.
-    # Index 1 corresponds to field shuffling (role/boundary stress) under our
-    # serialization format.
+    """Build a realistic robustness slice.
+
+    For HTTP-like records, fully shuffling *all* serialized fields is often too
+    destructive (it can effectively change semantics). Here we use gentler,
+    record-aware operators: reorder query/body/header groups and normalize
+    whitespace.
+    """
     out = []
     for i, x in enumerate(texts):
-        vs = make_variants(x, seed=seed + i)
-        out.append(vs[1])
+        y = drift_reorder_kv_groups(x, seed=seed + i)
+        y = drift_whitespace(y)
+        out.append(y)
     return out
 
 
@@ -67,7 +72,7 @@ def main():
     ap.add_argument(
         "--models",
         type=str,
-        default="tiny,base",
+        default="tiny,small",
         help="Comma-separated model sizes to run: tiny,small,base",
     )
     ap.add_argument(
@@ -78,9 +83,15 @@ def main():
     )
     ap.add_argument("--batch-size", type=int, default=32)
     ap.add_argument("--lr", type=float, default=3e-4)
+    ap.add_argument("--grad-clip", type=float, default=1.0)
     ap.add_argument("--device", type=str, default="cuda")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--outdir", type=str, default="paper/e5_csic_http")
+    ap.add_argument(
+        "--include-raw",
+        action="store_true",
+        help="Include the raw HTTP request field in serialization (off by default for tokenizer-centric runs).",
+    )
     ap.add_argument("--n-train", type=int, default=20000)
     ap.add_argument("--n-val", type=int, default=5000)
     ap.add_argument("--n-test", type=int, default=5000)
@@ -120,9 +131,23 @@ def main():
             subprocess.check_call([sys.executable, str(setup_script), "--out", str(data_dir)])
 
     Xtr, ytr, Xva, yva, Xte, yte = load_csic2010_http(
-        args.data_dir, n_train=args.n_train, n_val=args.n_val, n_test=args.n_test, seed=args.seed
+        args.data_dir,
+        n_train=args.n_train,
+        n_val=args.n_val,
+        n_test=args.n_test,
+        seed=args.seed,
+        include_raw=bool(args.include_raw),
     )
     n_classes = len(set(ytr))
+
+    # Class-imbalance handling (important for HTTP anomaly detection): compute
+    # inverse-frequency weights so training does not collapse to majority class.
+    counts = [0] * n_classes
+    for yy in ytr:
+        if 0 <= int(yy) < n_classes:
+            counts[int(yy)] += 1
+    total = max(1, sum(counts))
+    class_weights = [float(total / max(1, c)) for c in counts]
 
     # Train tokenizers on training serialization.
     bpe = train_bpe(Xtr, vocab_size=args.vocab)
@@ -179,6 +204,11 @@ def main():
 
             model = make_model(model_kind, vocab_size=args.vocab, n_classes=n_classes, max_len=args.max_len)
 
+            # Conservative LR scaling for larger models to avoid collapse.
+            lr_eff = float(args.lr)
+            if model_kind == "base":
+                lr_eff = min(lr_eff, 2e-4)
+
             log_path = outdir / "train_logs" / f"{model_kind}_{tok_name}.jsonl"
             model = train_compute_matched(
                 model,
@@ -188,8 +218,11 @@ def main():
                 total_tokens=args.total_tokens,
                 device=args.device,
                 batch_size=args.batch_size,
-                lr=args.lr,
+                lr=lr_eff,
                 probe_only=False,
+                grad_clip=float(args.grad_clip),
+                class_weights=class_weights,
+                warmup_tokens=max(50_000, int(args.total_tokens // 20)),
                 log_path=str(log_path),
                 eval_pairs=val_pairs,
                 eval_every_tokens=max(50_000, args.total_tokens // 50),

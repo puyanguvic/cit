@@ -4,16 +4,18 @@
     "data_dir": "data/csic2010",
     "vocab": 2048,
     "max_len": 512,
-    "models": "tiny,base",
-    "total_tokens": 10000000,
+    "models": "tiny,small",
+    "total_tokens": 5000000,
     "batch_size": 32,
     "lr": 0.0003,
+    "grad_clip": 1.0,
     "device": "cuda",
     "seed": 0,
     "outdir": "paper/e5_csic_http",
+    "include_raw": false,
     "n_train": 20000,
     "n_val": 5000,
     "n_test": 5000,
-    "auto_download": true
+    "auto_download": false
   }
 }

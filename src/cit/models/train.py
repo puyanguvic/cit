@@ -51,6 +51,9 @@ def train_compute_matched(
     log_path: Optional[str] = None,
     eval_pairs: Optional[Sequence[Tuple[List[int], int]]] = None,
     eval_every_tokens: int = 200_000,
+    grad_clip: float = 1.0,
+    class_weights: Optional[Sequence[float]] = None,
+    warmup_tokens: int = 0,
     on_log: Optional[Callable[[dict], None]] = None,
     show_progress: bool = True,
     progress_desc: str = "train_model",
@@ -80,7 +83,11 @@ def train_compute_matched(
     if not params:
         params = list(model.parameters())
     opt = optim.AdamW(params, lr=lr)
-    loss_fn = nn.CrossEntropyLoss()
+    if class_weights is not None:
+        w = torch.tensor(list(class_weights), dtype=torch.float)
+        loss_fn = nn.CrossEntropyLoss(weight=w.to(device))
+    else:
+        loss_fn = nn.CrossEntropyLoss()
 
     import json
     import time
@@ -90,6 +97,9 @@ def train_compute_matched(
     model.train()
     it = iter(dl)
     t0 = time.time()
+    base_lr = lr
+    if warmup_tokens and warmup_tokens > 0:
+        warmup_tokens = int(warmup_tokens)
     pbar = None
     if show_progress and total_tokens > 0:
         pbar = tqdm(
@@ -123,6 +133,15 @@ def train_compute_matched(
         logits = model(x, m)
         loss = loss_fn(logits, y)
         loss.backward()
+
+        if grad_clip is not None and grad_clip > 0:
+            torch.nn.utils.clip_grad_norm_(params, max_norm=float(grad_clip))
+
+        # Simple token-based warmup to improve stability for larger models.
+        if warmup_tokens and warmup_tokens > 0:
+            scale = min(1.0, float(seen_tokens + int(m.sum().item())) / float(warmup_tokens))
+            for pg in opt.param_groups:
+                pg["lr"] = base_lr * scale
         opt.step()
 
         seen_tokens += int(m.sum().item())
@@ -142,6 +161,7 @@ def train_compute_matched(
                     "train_loss": float(loss.item()),
                     "train_acc": acc,
                     "wall_s": float(time.time() - t0),
+                    "lr": float(opt.param_groups[0]["lr"]),
                 }
                 if eval_pairs is not None and len(eval_pairs) > 0:
                     from .eval import evaluate
