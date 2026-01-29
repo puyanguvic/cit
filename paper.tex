@@ -54,12 +54,14 @@ Building on this formulation, we propose \textbf{Controlled Interface Tokenizati
 
 \paragraph{Contributions.}
 Our contributions are:
-\begin{itemize}[leftmargin=1.25em, itemsep=0.2em, topsep=0.2em]
-    \item We identify \emph{prefix semantic collapse} as an interface failure mode for structured streams: distinct task-relevant prefix states become indistinguishable after prefix-emitting tokenization, creating irrecoverable information loss under any downstream encoder.
-    \item We propose \emph{directed semantic distortion}, a prefix-aligned, task-relevant measure of interface-induced information loss, enabling empirical rate--distortion analysis for tokenization interfaces.
-    \item We introduce \textbf{CIT}, a contract-constrained, deterministic tokenization system that preserves role boundaries and typed-value integrity while inducing deployment-aligned vocabularies under prefix-emitting execution.
-    \item We empirically validate a causal chain from interface to learning to system behavior: CIT avoids collapse on a synthetic prefix stress test, improves end-to-end learning and drift robustness under token-fair training on a public HTTP benchmark, and shifts the accuracy--latency Pareto frontier under fully trained encoder models.
+
+\begin{itemize}
+  \item We identify \emph{prefix semantic collapse} as an interface failure mode for structured streams: distinct task-relevant prefix states become indistinguishable after prefix-emitting tokenization, creating irrecoverable information loss under any downstream encoder.
+  \item We propose \emph{directed semantic distortion}, a prefix-aligned, task-relevant measure of interface-induced information loss, enabling empirical rate--distortion analysis for tokenization interfaces.
+  \item We introduce \textbf{CIT}, a contract-constrained, deterministic tokenization system that preserves role boundaries and typed-value integrity while inducing deployment-aligned vocabularies under prefix-emitting execution.
+  \item We empirically validate a causal chain from interface to learning to system behavior: CIT avoids collapse on a synthetic prefix stress test, improves end-to-end learning and drift robustness under token-fair training on a public HTTP benchmark, and shifts the accuracy--latency Pareto frontier under fully trained encoder models.
 \end{itemize}
+
 
 The remainder of the paper develops the interface formulation, presents CIT, and evaluates its efficiency, robustness, and end-to-end impact under strict drop-in constraints.
 
@@ -731,7 +733,24 @@ The byte-level baseline confirms that the task signal is recoverable under a los
 Under semantics-preserving drift, CIT remains stable while baselines degrade, consistent with collapse being an interface property rather than a modeling artifact.
 
 Results are summarized in Table~\ref{tab:e1_synth}.
-\input{results/paper/paper_artifacts/main/tables/e1_synth}
+
+\begin{table}[t]
+\centering
+\small
+\begin{tabular}{lrrrr}
+\toprule
+Tokenizer & Test acc. & Drift acc. & Rate $\mathbb{E}[|Z|]$ & Distortion $\hat{\Delta}$ \\
+\midrule
+BPE & 0.049 & 0.045 & 644.9 & 0.749 \\
+Bytes & 0.042 & 0.041 & 1057.9 & 0.453 \\
+CIT & 1.000 & 0.826 & 81.0 & 0.295 \\
+Unigram & 0.056 & 0.053 & 691.7 & 0.667 \\
+WordPiece & 0.045 & 0.027 & 648.0 & 0.663 \\
+\bottomrule
+\end{tabular}
+\caption{E1 (synthetic) summary across seeds.}
+\label{tab:e1_synth}
+\end{table}
 
 This experiment validates directed semantic distortion as an interface-level metric:
 tokenizers with lower $\widehat{\Delta}(\tau)$ exhibit improved robustness under drift, even under token-fair training budgets.
@@ -748,10 +767,33 @@ Compared to the lossless byte-level baseline, CIT targets similar robustness at 
 In final test accuracy, CIT is competitive or better under compute-matched budgets, with the largest gains appearing in drift robustness.
 
 Table~\ref{tab:e2_csic_token_fair} summarizes final accuracy, drift accuracy, and token-length statistics under token-fair training, and Figure~\ref{fig:e2_csic_token_fair_frontier_acc_vs_len} shows the resulting accuracy--length frontier.
-\input{results/paper/paper_artifacts/main/tables/e2_csic_token_fair}
+
+\begin{table}[t]
+\centering
+\small
+\begin{tabular}{llrrrr}
+\toprule
+Model & Tokenizer & Acc. & Drift acc. & avg\_len & p95\_len \\
+\midrule
+small & BPE & 0.898 & 0.490 & 327.2 & 514 \\
+small & Bytes & 0.686 & 0.442 & 785.3 & 1059 \\
+small & CIT & 0.913 & 0.913 & 217.0 & 416 \\
+small & Unigram & 0.860 & 0.860 & 406.4 & 595 \\
+small & WordPiece & 0.918 & 0.486 & 329.4 & 526 \\
+tiny & BPE & 0.853 & 0.469 & 327.2 & 514 \\
+tiny & Bytes & 0.686 & 0.457 & 785.3 & 1059 \\
+tiny & CIT & 0.909 & 0.909 & 217.0 & 416 \\
+tiny & Unigram & 0.795 & 0.792 & 406.4 & 595 \\
+tiny & WordPiece & 0.879 & 0.465 & 329.4 & 526 \\
+\bottomrule
+\end{tabular}
+\caption{E2 (CSIC 2010 HTTP) token-fair summary across seeds.}
+\label{tab:e2_csic_token_fair}
+\end{table}
+
 \begin{figure}[t]
 \centering
-\includegraphics[width=\linewidth]{paper_figures/e2_csic_token_fair_frontier_acc_vs_len.pdf}
+\includegraphics[width=\linewidth]{Figs/e2_csic_token_fair_frontier_acc_vs_len.pdf}
 \caption{E2 (CSIC 2010 HTTP) token-fair frontier (10M tokens, $L_{\max}{=}512$): accuracy vs.\ average sequence length across tokenizers and model sizes.}
 \label{fig:e2_csic_token_fair_frontier_acc_vs_len}
 \end{figure}
@@ -763,10 +805,32 @@ A step-fair control (appendix) preserves CIT's drift robustness while attenuatin
 Beyond final accuracy, learning curves (validation accuracy vs.\ seen encoder tokens) show that CIT reaches strong operating points in fewer tokens and with fewer optimization steps under token-fair budgets (Figure~\ref{fig:e2_csic_token_fair_learning_curves_tiny}).
 This provides an end-to-end notion of \emph{convergence under interface constraints} that complements the interface-only distortion diagnostics.
 
-\input{results/paper/paper_artifacts/main/tables/e2_csic_convergence}
+\begin{table}[t]
+\centering
+\small
+\begin{tabular}{llr}
+\toprule
+Model & Tokenizer & $t_{95}$ (M tokens) \\
+\midrule
+small & BPE & 4.77 \\
+small & Bytes & 3.83 \\
+small & CIT & 1.64 \\
+small & Unigram & 6.29 \\
+small & WordPiece & 4.98 \\
+tiny & BPE & 6.66 \\
+tiny & Bytes & 6.18 \\
+tiny & CIT & 2.44 \\
+tiny & Unigram & 7.12 \\
+tiny & WordPiece & 4.96 \\
+\bottomrule
+\end{tabular}
+\caption{E2 (CSIC 2010 HTTP) token-fair convergence: tokens to reach 95\% of best validation accuracy (from learning curves).}
+\label{tab:e2_csic_convergence}
+\end{table}
+
 \begin{figure}[t]
 \centering
-\includegraphics[width=\linewidth]{paper_figures/e2_csic_token_fair_learning_curves_tiny.pdf}
+\includegraphics[width=\linewidth]{Figs/e2_csic_token_fair_learning_curves_tiny.pdf}
 \caption{E2 (CSIC 2010 HTTP) token-fair learning curves (Tiny, 10M tokens, $L_{\max}{=}512$): validation accuracy as a function of seen encoder tokens.}
 \label{fig:e2_csic_token_fair_learning_curves_tiny}
 \end{figure}
@@ -782,17 +846,40 @@ The byte-level baseline provides a complementary operating point with high fidel
 Overall, CIT improves operating points on the accuracy--latency and accuracy--parameter frontiers by simultaneously reducing interface cost and preserving task-relevant prefix information (lower surrogate distortion), enabling smaller models to match the accuracy of larger baselines in some regimes.
 
 Results are summarized in Table~\ref{tab:e3_pareto} and Figure~\ref{fig:e3_pareto}.
-\input{results/paper/paper_artifacts/main/tables/e3_pareto}
-\begin{figure}[t]
+
+\begin{table}[t]
 \centering
-\includegraphics[width=0.32\linewidth]{paper_figures/e3_pareto_acc_vs_len.pdf}
+\small
+\begin{tabular}{llrrrrrr}
+\toprule
+Backbone & Tokenizer & Params (M) & Acc. & avg\_len & p95\_len & Distortion $\hat{\Delta}$ & p95 latency (ms) \\
+\midrule
+mini & BPE & 3.82 & 0.843 & 106.3 & 111 & 0.206 & 1.40 \\
+mini & Bytes & 3.82 & 0.826 & 336.5 & 347 & 0.287 & 9.38 \\
+mini & CIT & 3.82 & 0.849 & 60.5 & 69 & 0.138 & 1.29 \\
+mini & Unigram & 3.82 & 0.835 & 233.0 & 245 & 0.287 & 5.35 \\
+mini & WordPiece & 3.82 & 0.852 & 106.4 & 112 & 0.185 & 1.43 \\
+small & BPE & 11.63 & 0.810 & 106.3 & 111 & 0.206 & 6.09 \\
+small & Bytes & 11.63 & 0.814 & 336.5 & 347 & 0.287 & 11.93 \\
+small & CIT & 11.63 & 0.809 & 60.5 & 69 & 0.138 & 4.75 \\
+small & Unigram & 11.63 & 0.760 & 233.0 & 245 & 0.287 & 15.13 \\
+small & WordPiece & 11.63 & 0.761 & 106.4 & 112 & 0.185 & 6.05 \\
+\bottomrule
+\end{tabular}
+\caption{E3 (Pareto slice) summary across seeds.}
+\label{tab:e3_pareto}
+\end{table}
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=0.32\linewidth]{Figs/e3_pareto_acc_vs_len.pdf}
 \hfill
-\includegraphics[width=0.32\linewidth]{paper_figures/e3_pareto_acc_vs_latency.pdf}
+\includegraphics[width=0.32\linewidth]{Figs/e3_pareto_acc_vs_latency.pdf}
 \hfill
-\includegraphics[width=0.32\linewidth]{paper_figures/e3_pareto_acc_vs_params.pdf}
+\includegraphics[width=0.32\linewidth]{Figs/e3_pareto_acc_vs_params.pdf}
 \caption{E3 (Pareto slice, Adult): (left) accuracy vs.\ average length, (middle) accuracy vs.\ P95 latency, (right) accuracy vs.\ parameter count.}
 \label{fig:e3_pareto}
-\end{figure}
+\end{figure*}
 
 \subsection{Summary}
 \label{sec:exp_summary}
@@ -820,6 +907,3 @@ Across synthetic and public structured benchmarks, CIT improves rate--distortion
 
 This work improves efficiency and robustness in structured prediction pipelines under fixed compute budgets.
 Applications should follow responsible data handling and privacy-preserving practices.
-
-% Appendix moved to a separate file for easier editing.
-\input{appendix}
