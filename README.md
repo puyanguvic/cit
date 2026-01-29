@@ -20,12 +20,18 @@ This repository ignores local bytecode caches and heavyweight model caches via `
 
 ## Experiments
 
-### E0 (tokenizer playground): pretrained tokenizers on structured data
+### E0 / Appendix E1 (tokenizer playground): pretrained tokenizers on structured data
 
 This scans off-the-shelf tokenizers (e.g., BERT, GPT-2, cl100k, Grok-1) on the paper's serialized datasets and saves token-length distribution stats.
 
 ```bash
 python scripts/run_e0_tokenizer_playground.py --dataset csic2010 --data-dir data/csic2010 --auto-download
+```
+
+Paper-friendly wrapper (recommended):
+
+```bash
+python scripts/appendix_e1.py --auto-download
 ```
 
 Customize the tokenizer list (name=repo_id pairs):
@@ -34,40 +40,39 @@ Customize the tokenizer list (name=repo_id pairs):
 python scripts/run_e0_tokenizer_playground.py --dataset csic2010 --data-dir data/csic2010 \\\n+  --tokenizers bert-base-cased,gpt2,gpt3=Xenova/text-davinci-003,gpt4=Xenova/gpt-4,grok1=Xenova/grok-1-tokenizer
 ```
 
-### E1 (synthetic structured stream + format drift variants)
+### E1 (synthetic structured stream + format drift variants) — main paper
 
 ```bash
-python scripts/run_e1_synth.py
+python scripts/e1.py
 ```
 
-### E2 (end-to-end, token-fair): CSIC 2010 HTTP
+### E2 (end-to-end, token-fair): CSIC 2010 HTTP — main paper
 
 CSIC files are not tracked in git (they live under `data/csic2010/`).
 
 ```bash
-python scripts/run_e2_csic_http.py --data-dir data/csic2010 --device cuda --seed 0 --auto-download
+python scripts/e2.py --device cuda --seed 0 --auto-download
 ```
 
-### E3 (Pareto slice: model size vs accuracy/latency)
+### E3 (Pareto slice: model size vs accuracy/latency) — main paper
 
 ```bash
-python scripts/run_e3_pareto_prefix.py --out e3_pareto.csv --device cuda
+python scripts/e3.py --device cuda --seed 0
 ```
 
-### Appendix: public tabular benchmarks (Adult / Credit-G)
+### Appendix E3: public tabular benchmarks (Adult / Credit-G)
 
 ```bash
-python scripts/run_e2_uci.py --dataset adult --vocab 2048 --device cuda
-python scripts/run_e2_uci.py --dataset credit-g --vocab 2048 --device cuda
+python scripts/appendix_e3.py --device cuda --seed 0
 ```
 
-### Appendix: Vocabulary-budget frontier (rate–distortion / accuracy)
+### Appendix E4: Vocabulary-budget frontier (rate–distortion / accuracy)
 
 ```bash
-python scripts/run_e4_frontier.py --vocabs 256,512,1024,2048,4096 --device cuda --outdir runs/e4_frontier --seed 0
+python scripts/appendix_e4.py --vocabs 256,512,1024,2048,4096 --device cuda --seed 0 --plot
 ```
 
-This produces `results/runs/e4_frontier/seed0/results.csv` and `frontier.csv`, plus tokenizer artifacts under `results/runs/e4_frontier/seed0/tokenizers/vocabXXXX/`.
+This produces `results/paper/appendix_e4/seed0/results.csv` and `frontier.csv`, plus tokenizer artifacts under `results/paper/appendix_e4/seed0/tokenizers/vocabXXXX/`.
 
 ### (Legacy name) E5: CSIC 2010 HTTP
 
@@ -102,7 +107,7 @@ Outputs (tokenizers, logs, metrics) will be written under `results/paper/e2_csic
 After running E4, generate paper-ready plots:
 
 ```bash
-python scripts/plot_frontier.py --run_dir results/runs/e4_frontier/seed0
+python scripts/plot_frontier.py --run_dir results/paper/appendix_e4/seed0
 ```
 
 All experiment outputs are written under the top-level `results/` folder.
@@ -113,18 +118,20 @@ All experiment outputs are written under the top-level `results/` folder.
 All scripts write outputs under `results/`. The default one-click runner runs the main-paper E1/E2/E3 and will auto-download CSIC 2010 if missing.
 
 ```bash
-python scripts/run_all.py --device cuda --seed 0 --plot
+python scripts/run_all.py --device cuda --seed 0
 ```
 
 This will populate:
-- `results/paper/e1_synth/seed0/...`
-- `results/paper/e2_csic_http/seed0/...`
-- `results/paper/e3_pareto/seed0/...`
+- `results/paper/e1/seed0/...`
+- `results/paper/e2/seed0/...`
+- `results/paper/e3/seed0/...`
+and export paper-ready artifacts under:
+- `results/paper/paper_artifacts/` (see `results/paper/paper_artifacts/MANIFEST.md`)
 
 To also run appendix sweeps:
 
 ```bash
-python scripts/run_all.py --device cuda --seed 0 --only uci,frontier --plot
+python scripts/run_all.py --device cuda --seed 0 --only appendix_e3,appendix_e4
 ```
 
 To disable auto-download for E2 (CSIC):
@@ -136,12 +143,18 @@ python scripts/run_all.py --device cuda --seed 0 --plot --no-auto-download
 To run multiple seeds and aggregate:
 
 ```bash
-python scripts/run_all.py --device cuda --seeds 0,1,2 --plot
+python scripts/run_all.py --device cuda --seeds 0,1,2
 python scripts/summarize_paper_results.py --run-root paper
 ```
 
 To run E0 (tokenizer playground) from the runner:
 
 ```bash
-python scripts/run_all.py --device cuda --seed 0 --only e0
+python scripts/run_all.py --device cuda --seed 0 --only appendix_e1
+```
+
+To skip paper artifact export (and keep runs minimal):
+
+```bash
+python scripts/run_all.py --device cuda --seed 0 --no-paper
 ```

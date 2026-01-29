@@ -55,6 +55,13 @@ def _token_label_purity(token_seqs, labels, min_count: int = 20, topk: int = 50)
 def hf_encode(tok, texts):
     return [tok.encode(t).ids for t in texts]
 
+def _encode_utf8_bytes_single(s: str) -> list[int]:
+    # Reserve 0 for pad_id in the encoder; keep byte ids in [1,256].
+    return [b + 1 for b in s.encode("utf-8", errors="replace")]
+
+def encode_utf8_bytes(texts: list[str]) -> list[list[int]]:
+    return [_encode_utf8_bytes_single(t) for t in texts]
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--outdir", type=str, default="runs/e1_synth")
@@ -128,6 +135,7 @@ def main():
         ("BPE", lambda t: hf_encode(bpe, t)),
         ("WordPiece", lambda t: hf_encode(wp, t)),
         ("Unigram", lambda t: hf_encode(uni, t)),
+        ("Bytes", encode_utf8_bytes),
         ("CIT", lambda t: [tokenize_longest_match(apply_contract(s, cit_contract), cit_art) for s in t]),
     ]
     for name, enc in tqdm(
@@ -165,6 +173,8 @@ def main():
         # distortion: use the same encoder function applied to *raw prefixes*
         if name == "CIT":
             enc_pref = lambda s: tokenize_longest_match(apply_contract(s, cit_contract), cit_art)
+        elif name == "Bytes":
+            enc_pref = _encode_utf8_bytes_single
         else:
             # tokenizers.Tokenizer encodes full string; for prefixes we just encode prefix strings.
             base_tok = {"BPE": bpe, "WordPiece": wp, "Unigram": uni}[name]

@@ -19,7 +19,7 @@ import torch
 from cit.utils.seed import set_seed
 from cit.data.uci import load_adult
 from cit.data.serialize import SerializeCfg, serialize_df
-from cit.tokenizers.hf_baselines import train_bpe, train_wordpiece
+from cit.tokenizers.hf_baselines import train_bpe, train_wordpiece, train_unigram
 from cit.tokenizers.cit_contract import Contract, apply_contract
 from cit.tokenizers.cit_induction import train_cit, InductionCfg
 from cit.tokenizers.runtime import tokenize_longest_match
@@ -32,6 +32,13 @@ from cit.tokenizers.metrics import DistortionCfg, estimate_surrogate_distortion,
 
 def hf_encode(tok, texts):
     return [tok.encode(t).ids for t in texts]
+
+def _encode_utf8_bytes_single(s: str) -> list[int]:
+    # Reserve 0 for pad_id in the encoder; keep byte ids in [1,256].
+    return [b + 1 for b in s.encode("utf-8", errors="replace")]
+
+def encode_utf8_bytes(texts: list[str]) -> list[list[int]]:
+    return [_encode_utf8_bytes_single(t) for t in texts]
 
 
 def measure_latency(model, sample_batch, device: str, iters: int = 50) -> float:
@@ -109,9 +116,10 @@ def main():
     Xtr = serialize_df(ds.X_train, ser_cfg)
     Xte = serialize_df(ds.X_test, ser_cfg)
 
-    # tokenizers: keep to 2 for speed in demo
+    # tokenizers: keep small for speed
     bpe = train_bpe(Xtr, vocab_size=args.vocab)
     wp = train_wordpiece(Xtr, vocab_size=args.vocab)
+    uni = train_unigram(Xtr, vocab_size=args.vocab)
 
     contract = Contract()
     cit_vocab, cit_contract = train_cit(
@@ -126,15 +134,19 @@ def main():
     tok_dir = outdir / "tokenizers"
     (tok_dir / "bpe").mkdir(parents=True, exist_ok=True)
     (tok_dir / "wordpiece").mkdir(parents=True, exist_ok=True)
+    (tok_dir / "unigram").mkdir(parents=True, exist_ok=True)
     (tok_dir / "cit").mkdir(parents=True, exist_ok=True)
     bpe.save(str(tok_dir / "bpe" / "tokenizer.json"))
     wp.save(str(tok_dir / "wordpiece" / "tokenizer.json"))
+    uni.save(str(tok_dir / "unigram" / "tokenizer.json"))
     save_vocab_json(cit_vocab, tok_dir / "cit" / "vocab.json")
     save_json(cit_contract, tok_dir / "cit" / "contract.json")
 
     tokenizers = [
         ("BPE", lambda t: hf_encode(bpe, t)),
         ("WordPiece", lambda t: hf_encode(wp, t)),
+        ("Unigram", lambda t: hf_encode(uni, t)),
+        ("Bytes", encode_utf8_bytes),
         ("CIT", lambda t: [tokenize_longest_match(apply_contract(s, cit_contract), cit_vocab) for s in t]),
     ]
 
@@ -160,8 +172,11 @@ def main():
         if tok_name == "CIT":
             enc_pref = lambda s: tokenize_longest_match(apply_contract(s, cit_contract), cit_vocab)
         else:
-            base_tok = {"BPE": bpe, "WordPiece": wp}[tok_name]
-            enc_pref = lambda s, _tok=base_tok: _tok.encode(s).ids
+            if tok_name == "Bytes":
+                enc_pref = _encode_utf8_bytes_single
+            else:
+                base_tok = {"BPE": bpe, "WordPiece": wp, "Unigram": uni}[tok_name]
+                enc_pref = lambda s, _tok=base_tok: _tok.encode(s).ids
         dist = estimate_surrogate_distortion(Xtr, ds.y_train.tolist(), encode_prefix=enc_pref, vocab_size=args.vocab, cfg=dcfg)
 
         for bb_name, bb_cfg in backbones:

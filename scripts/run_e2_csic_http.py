@@ -37,6 +37,13 @@ from cit.utils.seed import set_seed
 def hf_encode(tok, texts: List[str]) -> List[List[int]]:
     return [tok.encode(t).ids for t in texts]
 
+def _encode_utf8_bytes_single(s: str) -> List[int]:
+    # Reserve 0 for pad_id in the encoder; keep byte ids in [1,256].
+    return [b + 1 for b in s.encode("utf-8", errors="replace")]
+
+def encode_utf8_bytes(texts: List[str]) -> List[List[int]]:
+    return [_encode_utf8_bytes_single(t) for t in texts]
+
 
 def build_drift_texts(texts: List[str], seed: int) -> List[str]:
     """Build a realistic robustness slice.
@@ -262,6 +269,7 @@ def main():
         ("BPE", lambda t: hf_encode(bpe, t)),
         ("WordPiece", lambda t: hf_encode(wp, t)),
         ("Unigram", lambda t: hf_encode(uni, t)),
+        ("Bytes", encode_utf8_bytes),
         ("CIT", lambda t: [tokenize_longest_match(apply_contract(s, cit_contract), cit_vocab) for s in t]),
     ]
 
@@ -444,4 +452,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

@@ -1,0 +1,41 @@
+\appendix
+
+\section{Additional Experiments}
+\label{sec:appendix_experiments}
+
+This appendix reports complementary evidence supporting the main-paper claims and clarifies controls that disentangle interface effects from optimization artifacts.
+We group results into (i) scans of widely used pretrained tokenizers as drop-in interfaces, (ii) a step-fair control for CSIC end-to-end training, (iii) additional public tabular benchmarks, and (iv) a vocabulary-budget frontier sweep.
+
+\subsection{Appendix E1: Pretrained Tokenizer Scan on Structured Inputs}
+\label{sec:appendix_e1_tokscan}
+
+To connect our controlled, budget-matched comparisons to real deployment choices, we run a tokenizer-only scan of widely used pretrained tokenizers (e.g., BERT- and GPT-family tokenizers) on the same serialized structured inputs.
+We report token-length distributions (avg./P95/P99) and truncation rates at a fixed maximum length ($L_{\max}{=}512$).
+This experiment is intentionally \emph{not} compute-matched: pretrained tokenizers differ in vocabulary size, training data, and special-token conventions.
+The goal is to quantify the practical severity of interface cost and truncation risk under common off-the-shelf choices when applied to structured streams.
+
+\subsection{Appendix E2: Step-Fair Control on CSIC 2010 HTTP}
+\label{sec:appendix_e2_stepfair}
+
+Token-fair budgets equalize the total number of non-padding encoder tokens processed, which makes interface efficiency directly translate into more parameter updates and faster learning in wall-clock and in steps.
+To separate gains due to improved token efficiency from gains due to interface correctness, we provide a step-fair control on CSIC that matches the number of optimizer steps across tokenizers while keeping all other settings fixed.
+The step-fair control preserves the qualitative robustness advantage of CIT under semantics-preserving drift, while attenuating some of the accuracy differences seen under token-fair budgets.
+This is consistent with robustness arising primarily from the interface (collapse vs.\ no collapse), and with part of the token-fair accuracy gains arising from higher effective sample throughput.
+
+\subsection{Appendix E3: Additional Public Tabular Benchmarks}
+\label{sec:appendix_e3_uci}
+
+We additionally evaluate on public tabular benchmarks (Adult and Credit-G) under the same drop-in constraints and token-fair training protocol.
+These datasets provide a complementary regime to CSIC: inputs are structured but less adversarial, and accuracy is less sensitive to robustness operators.
+We report rate, surrogate distortion, and end-to-end accuracy, and observe the same general trend that interface-specialized tokenization improves rate--distortion trade-offs without sacrificing downstream utility under matched budgets.
+
+\subsection{Appendix E4: Vocabulary-Budget Frontier}
+\label{sec:appendix_e4_frontier}
+
+Finally, we sweep vocabulary budgets to trace empirical rate--distortion and accuracy frontiers.
+For each vocabulary size, we train each tokenizer on the same training serialization and evaluate (avg./P95) token length, surrogate distortion $\widehat{\Delta}(\tau)$, and end-to-end accuracy under a fixed encoder-token budget.
+This sweep illustrates how interface constraints and distortion-aware induction shift the frontier, yielding better operating points under tight budgets.
+
+\paragraph{Reproducibility.}
+All main-paper and appendix experiments are implemented as deterministic scripts with fixed serialization and compute-matched training budgets, and the full suite can be run end-to-end from a single driver that also exports publication-ready tables and figures.
+

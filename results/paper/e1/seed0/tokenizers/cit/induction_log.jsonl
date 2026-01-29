@@ -1,0 +1,3 @@
+{"step": -1, "vocab_size": 10, "base_rate": 117.512, "base_dist": 0.9857859746498457}
+{"step": 50, "token": "NG", "vocab_size": 51, "rate": 117.494, "dist": 0.9376750631175047, "score": 95000.0, "mode": "fast"}
+{"step": 100, "token": "sign", "vocab_size": 101, "rate": 91.042, "dist": 0.502536477704444, "score": 15000.0, "mode": "fast"}

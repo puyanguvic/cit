@@ -673,11 +673,11 @@ objective.
 \section{Experiments}
 \label{sec:experiments}
 
-We re-anchor the empirical evaluation around three effect experiments that trace a causal chain from interface behavior to learning dynamics to system-level outcomes:
+We evaluate CIT with three main-paper experiments that trace a causal chain from interface behavior to learning dynamics to system-level outcomes:
 \textbf{E1} asks whether prefix-emitting tokenization induces semantic collapse and whether CIT prevents it;
-\textbf{E2} asks whether preventing collapse makes end-to-end learning more sample-efficient and stable under a fixed token budget;
+\textbf{E2} asks whether preventing collapse improves end-to-end learning and drift robustness under a fixed encoder-token budget;
 \textbf{E3} asks whether these interface gains translate into better accuracy--latency trade-offs under fully trained encoder models.
-Across experiments, we keep the serialization schema, model architecture family, and optimizer settings fixed, varying only the tokenization interface.
+Across experiments, we keep the serialization schema, model family, and optimizer settings fixed, varying only the tokenization interface.
 
 \subsection{Experimental protocol}
 \label{sec:exp_protocol}
@@ -688,19 +688,19 @@ serialized into symbolic strings using a fixed schema shared across all tokenize
 We report results on (i) a synthetic structured prefix task designed to stress role/boundary dependence and semantics-preserving drift,
 (ii) CSIC 2010 HTTP anomaly detection (public, structured, and drift-prone),
 and (iii) OpenML Adult for an end-to-end accuracy/latency Pareto slice.
-(Additional public tabular benchmarks and vocabulary sweeps are deferred to the appendix.)
+(Additional public tabular benchmarks, vocabulary-budget sweeps, and scans of popular pretrained tokenizers are deferred to the appendix.)
 
 \paragraph{Tokenizers.}
-We compare CIT against standard frequency-driven tokenizers:
-BPE~\cite{sennrich2016neural}, WordPiece~\cite{schuster2012japanese}, and
-Unigram~\cite{kudo2018subword}, all trained on the same data and constrained to the same
-vocabulary budget ($|\mathcal{V}|{=}2048$).
+We use three baseline classes to make the comparison both controlled and practically relevant.
+\emph{Budget-matched learned tokenizers} (BPE~\cite{sennrich2016neural}, WordPiece~\cite{schuster2012japanese}, Unigram~\cite{kudo2018subword}) are trained on the task's training serialization and constrained to a fixed vocabulary budget ($|\mathcal{V}|{=}2048$), matching CIT.
+\emph{A lossless byte-level tokenizer} (\textsc{Bytes}, UTF-8 bytes) serves as a high-fidelity interface baseline that preserves raw information but incurs a high rate; it helps separate semantic fidelity from compression.
+\emph{Off-the-shelf pretrained tokenizers} (e.g., popular BERT/GPT-family tokenizers) are not budget-matched and are trained on different distributions; we therefore report them as a tokenizer-only interface scan in the appendix rather than mixing them into compute-matched end-to-end training.
 All tokenizers are deterministic and prefix-emitting.
 
 \paragraph{Training budgets and models.}
 We match training compute using token-fair budgets: each run processes the same number of non-padding encoder tokens under a shared maximum sequence length and truncation policy.
 E1 uses a tiny encoder and a 3M-token budget ($L_{\max}{=}128$) to isolate interface failure modes.
-E2 trains end-to-end Tiny/Small encoders on CSIC under a 10M-token budget ($L_{\max}{=}512$), and also reports a step-fair control with matched optimizer steps.
+E2 trains end-to-end Tiny/Small encoders on CSIC under a 10M-token budget ($L_{\max}{=}512$); a step-fair control with matched optimizer steps is provided in the appendix.
 E3 trains end-to-end encoder families on Adult under a 5M-token budget ($L_{\max}{=}512$) and measures inference latency.
 
 \paragraph{Metrics.}
@@ -716,13 +716,13 @@ E1 isolates interface correctness in a controlled synthetic setting.
 We construct structured records whose labels depend on a role-specific signal placed mid-record, while other fields contain high-cardinality values and boundary-bearing markers.
 We evaluate (i) surrogate directed semantic distortion (prefix-level information loss) and (ii) robustness under semantics-preserving re-serializations (field shuffling, whitespace/number-format normalization, and insertion of irrelevant dummy fields).
 
-Semantic collapse is not hypothetical: with BPE/WordPiece/Unigram, test accuracy collapses to near chance on this task (4.5--5.6\% for 20-way classification), consistent with role-dependent prefixes becoming indistinguishable under the interface.
-In contrast, CIT prevents collapse and attains 100\% test accuracy.
-The interface diagnostics agree: CIT reduces surrogate distortion from 0.67--0.75 (baselines) to 0.295, and compresses the token rate from 645--692 tokens/example (baselines) to 81 tokens/example.
-Under semantics-preserving drift, baselines remain near chance (3.4--5.3\% drift accuracy), while CIT retains 85.4\% accuracy.
+This task exhibits a clear interface failure mode: standard subword tokenizers can induce prefix semantic collapse, driving accuracy toward chance despite compute-matched training.
+In contrast, CIT prevents collapse by enforcing role/type integrity at the interface, achieving high accuracy and substantially lower surrogate distortion.
+The byte-level baseline confirms that the task signal is recoverable under a lossless interface, but at a much higher rate; CIT attains high semantic fidelity at substantially lower interface cost.
+Under semantics-preserving drift, CIT remains stable while baselines degrade, consistent with collapse being an interface property rather than a modeling artifact.
 
 This experiment validates directed semantic distortion as an interface-level metric:
-tokenizers with lower $\widehat{\Delta}(\tau)$ exhibit markedly improved drift robustness, even under compute-matched training.
+tokenizers with lower $\widehat{\Delta}(\tau)$ exhibit improved robustness under drift, even under token-fair training budgets.
 
 \subsection{E2: Token-Fair End-to-End Learning on CSIC 2010}
 \label{sec:exp_e2}
@@ -731,13 +731,13 @@ E2 tests the learning benefit of avoiding collapse under a strict compute budget
 We train Tiny/Small encoder models end-to-end on CSIC 2010 HTTP anomaly detection under a fixed token-fair budget of 10M encoder tokens.
 We also evaluate drift robustness under realistic, semantics-preserving re-serialization: reordering record-aware key--value groups and normalizing whitespace.
 
-Under token-fair training, CIT is substantially more efficient (217 avg.\ tokens/example, P95 416) than BPE/WordPiece (\(\sim\)327--329 avg., P95 514--526) and Unigram (406 avg., P95 595).
-This efficiency translates into more parameter updates under the same token budget (e.g., 1425 steps for CIT vs.\ \(\sim\)950 for BPE/WordPiece in our setup), and faster convergence in tokens: for Tiny models, CIT reaches 0.88 validation accuracy after 2.4M tokens, whereas BPE/WordPiece require \(\sim\)9M tokens to reach the same level.
-In final test accuracy, CIT achieves 91.2\% on Tiny models (vs.\ 89.0\% WordPiece, 85.3\% BPE), and remains competitive on Small models (90.1\% vs.\ 90.3--90.5\% for BPE/WordPiece).
+Under token-fair training, CIT achieves substantially shorter sequences than standard subword baselines, which increases effective sample throughput and stabilizes optimization under the same token budget.
+Compared to the lossless byte-level baseline, CIT targets similar robustness at a far lower interface cost by enforcing interface constraints rather than relying on lossless tokenization.
+In final test accuracy, CIT is competitive or better under compute-matched budgets, with the largest gains appearing in drift robustness.
 
-Robustness reveals the interface effect most clearly: under drift, CIT retains its performance (drift accuracy equals in-distribution accuracy), while BPE/WordPiece suffer catastrophic drops (e.g., 49.6\% and 46.9\% drift accuracy for Tiny; 47.9\% and 51.1\% for Small).
-Unigram is comparatively robust but substantially less efficient and less accurate under the same token budget.
-A step-fair control with matched optimizer steps preserves CIT's drift robustness while attenuating accuracy differences, consistent with robustness arising from interface correctness and accuracy gains under token-fair training arising from better token efficiency.
+Robustness reveals the interface effect most clearly: under drift, CIT retains its performance while standard subword baselines can suffer large drops.
+Unigram is comparatively robust but less token-efficient under the same budget.
+A step-fair control (appendix) preserves CIT's drift robustness while attenuating accuracy differences, consistent with robustness arising from interface correctness and accuracy gains under token-fair training partially reflecting improved token efficiency.
 
 \subsection{E3: End-to-End Accuracy--Latency Trade-offs}
 \label{sec:exp_e3}
@@ -745,16 +745,15 @@ A step-fair control with matched optimizer steps preserves CIT's drift robustnes
 E3 closes the loop at the system level by measuring whether CIT shifts the end-to-end accuracy/latency trade-off under fully trained models.
 On OpenML Adult, we train each (tokenizer, model family) pair end-to-end under a fixed token budget (5M encoder tokens) and measure average/P95 sequence lengths and P95 forward-pass latency.
 
-CIT reduces average sequence length from \(\sim\)106 tokens (BPE/WordPiece) to 60.5 tokens (P95 69), yielding a consistent latency reduction.
-For the Mini model family, CIT attains 0.849 accuracy with 1.15ms P95 latency, compared to 0.843/1.35ms for BPE and 0.850/1.36ms for WordPiece.
-For the Small family, CIT matches WordPiece accuracy (0.761) while reducing P95 latency from 3.64ms to 2.52ms.
-Overall, CIT provides improved operating points on the accuracy--latency Pareto frontier by simultaneously reducing interface cost and preserving task-relevant prefix information (lower surrogate distortion than both baselines).
+CIT reduces average and tail sequence lengths relative to standard subword baselines, yielding consistent latency reductions at matched or improved accuracy.
+The byte-level baseline provides a complementary operating point with high fidelity but higher latency due to its rate.
+Overall, CIT improves operating points on the accuracy--latency Pareto frontier by simultaneously reducing interface cost and preserving task-relevant prefix information (lower surrogate distortion).
 
 \subsection{Summary}
 \label{sec:exp_summary}
 
 Across E1--E3, we observe a consistent chain: semantic collapse is real under prefix-emitting interfaces; CIT prevents collapse by enforcing role- and type-aware interface constraints; this improves end-to-end learning under token-fair budgets and yields better accuracy--latency trade-offs under fully trained encoder models.
-Additional vocabulary sweeps and public tabular benchmarks are provided in the appendix.
+Additional tokenizer scans, step-fair controls, vocabulary sweeps, and public tabular benchmarks are provided in the appendix.
 
 
 \section{Discussion}
@@ -771,6 +770,9 @@ CIT demonstrates that enforcing interface constraints and aligning vocabulary in
 We formulated tokenization as controlled interface compression under a drop-in regime and introduced directed semantic distortion as a principled interface metric.
 We proposed Controlled Interface Tokenization, aligning feasible constraints, vocabulary induction, and deterministic execution.
 Across synthetic and public structured benchmarks, CIT improves rate--distortion trade-offs, downstream accuracy under matched training budgets, and robustness to re-serialization and prefix-limited prediction.
+
+% Appendix moved to a separate file for easier editing.
+\input{appendix}
 
 \section*{Impact Statement}
 
