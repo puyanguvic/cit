@@ -14,6 +14,8 @@ We report token-length distributions (avg./P95/P99) and truncation rates at a fi
 This experiment is intentionally \emph{not} compute-matched: pretrained tokenizers differ in vocabulary size, training data, and special-token conventions.
 The goal is to quantify the practical severity of interface cost and truncation risk under common off-the-shelf choices when applied to structured streams.
 
+\input{results/paper/paper_artifacts/appendix/tables/e0_tokenizer_playground}
+
 \subsection{Appendix E2: Step-Fair Control on CSIC 2010 HTTP}
 \label{sec:appendix_e2_stepfair}
 
@@ -29,6 +31,8 @@ We additionally evaluate on public tabular benchmarks (Adult and Credit-G) under
 These datasets provide a complementary regime to CSIC: inputs are structured but less adversarial, and accuracy is less sensitive to robustness operators.
 We report rate, surrogate distortion, and end-to-end accuracy, and observe the same general trend that interface-specialized tokenization improves rate--distortion trade-offs without sacrificing downstream utility under matched budgets.
 
+\input{results/paper/paper_artifacts/appendix/tables/uci}
+
 \subsection{Appendix E4: Vocabulary-Budget Frontier}
 \label{sec:appendix_e4_frontier}
 
@@ -36,6 +40,87 @@ Finally, we sweep vocabulary budgets to trace empirical rate--distortion and acc
 For each vocabulary size, we train each tokenizer on the same training serialization and evaluate (avg./P95) token length, surrogate distortion $\widehat{\Delta}(\tau)$, and end-to-end accuracy under a fixed encoder-token budget.
 This sweep illustrates how interface constraints and distortion-aware induction shift the frontier, yielding better operating points under tight budgets.
 
+\input{results/paper/paper_artifacts/appendix/tables/frontier}
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.48\linewidth]{results/paper/paper_artifacts/appendix/figures/frontier_acc_vs_len.pdf}
+\includegraphics[width=0.48\linewidth]{results/paper/paper_artifacts/appendix/figures/frontier_acc_vs_distortion.pdf}
+\includegraphics[width=0.48\linewidth]{results/paper/paper_artifacts/appendix/figures/frontier_len_vs_distortion.pdf}
+\includegraphics[width=0.48\linewidth]{results/paper/paper_artifacts/appendix/figures/frontier_tokenize_ms_vs_len.pdf}
+\caption{Appendix: vocabulary-budget frontier sweep plots.}
+\label{fig:appendix_frontier}
+\end{figure}
+
 \paragraph{Reproducibility.}
 All main-paper and appendix experiments are implemented as deterministic scripts with fixed serialization and compute-matched training budgets, and the full suite can be run end-to-end from a single driver that also exports publication-ready tables and figures.
 
+\section{Mathematical Proofs}
+\label{app:proofs}
+
+This appendix collects deferred proofs that support interface-level claims in the main text.
+
+\subsection{Non-negativity of directed semantic distortion}
+\label{app:distortion_nonneg}
+
+\begin{proposition}[Non-negativity of directed semantic distortion]
+\label{prop:distortion_nonneg}
+For any deterministic, prefix-emitting tokenizer $\tau$ and any prefix length $t$,
+\[
+\mathcal{R}_\tau(t) \;\ge\; \mathcal{R}^\star(t),
+\]
+where $\mathcal{R}^\star(t)$ and $\mathcal{R}_\tau(t)$ are defined in
+Eq.~\eqref{eq:bayes_risk_raw} and Eq.~\eqref{eq:bayes_risk_tok}, respectively.
+Consequently, the directed semantic distortion $\Delta(\tau)$ in Eq.~\eqref{eq:semantic_distortion} is non-negative.
+\end{proposition}
+
+\begin{proof}
+Fix $t$ and let $Z^{(t)}=\tau(X_{1:t})$.
+Any token-observing predictor $q(\,\cdot \mid Z^{(t)})$ induces a raw-prefix predictor
+$\tilde{q}(\,\cdot \mid X_{1:t}) \triangleq q(\,\cdot \mid \tau(X_{1:t}))$ by composition with $\tau$.
+Since $\mathcal{R}^\star(t)$ is the minimum achievable risk when observing $X_{1:t}$,
+\[
+\mathcal{R}^\star(t)
+\;\le\;
+\mathbb{E}\!\left[\ell\!\left(\tilde{q}(\,\cdot \mid X_{1:t}),Y\right)\right]
+\;=\;
+\mathbb{E}\!\left[\ell\!\left(q(\,\cdot \mid Z^{(t)}),Y\right)\right]
+\]
+for every such $q$.
+Taking the minimum over $q$ yields $\mathcal{R}^\star(t)\le \mathcal{R}_\tau(t)$.
+Averaging over $t$ and taking expectations gives $\Delta(\tau)\ge 0$.
+\end{proof}
+
+\subsection{Proof of Proposition~\ref{prop:irrecoverability}}
+\label{app:proof_irrecoverability}
+
+\begin{proof}[Proof of Proposition~\ref{prop:irrecoverability}]
+Let $X_{1:t}$ and $X'_{1:t}$ satisfy $\tau(X_{1:t})=\tau(X'_{1:t})=Z^{(t)}$.
+Because $\tau$ is deterministic and prefix-emitting, the tokenized prefix is a deterministic function of the raw prefix.
+Therefore, any token-observing predictor $q(\,\cdot \mid Z^{(t)})$ must produce the same conditional predictive distribution for both raw prefixes, since its input is identical.
+
+To show that this can induce strictly positive excess Bayes risk, consider any strictly proper scoring rule $\ell$ (e.g., log loss / cross-entropy), for which the Bayes-optimal prediction is unique and equals the true conditional distribution.
+If both prefixes occur with nonzero probability and their Bayes-optimal semantic states differ, i.e.,
+$P^\star(\,\cdot \mid X_{1:t}) \neq P^\star(\,\cdot \mid X'_{1:t})$,
+then conditioning on $Z^{(t)}$ forces the Bayes-optimal token-observing predictor to predict the mixture
+$P^\star(\,\cdot \mid Z^{(t)})$, which is strictly worse (in expected loss) than predicting each conditional distribution separately.
+Equivalently, the Bayes risk strictly decreases under the finer observation $X_{1:t}$ compared to the coarser observation $Z^{(t)}$, yielding
+$\mathcal{R}_\tau(t) > \mathcal{R}^\star(t)$.
+This strict gap is induced by information discarded by the interface and therefore cannot be eliminated by modifying the downstream model without changing $\tau$.
+\end{proof}
+
+\subsection{Proof of Proposition~\ref{prop:greedy_descent}}
+\label{app:proof_greedy_descent}
+
+\begin{proof}[Proof of Proposition~\ref{prop:greedy_descent}]
+By definition of compression gain (Eq.~\eqref{eq:gain_def}),
+\[
+R(\tau_{\mathcal{V}_{k+1}})
+=
+R(\tau_{\mathcal{V}_k}) - G(c_k;\mathcal{V}_k).
+\]
+Under the greedy selection rule (Eq.~\eqref{eq:alg_selection_gain}), $c_k$ maximizes $G(c;\mathcal{V}_k)$ over
+contract-feasible candidates.
+With the natural convention that the procedure may perform a no-op when all candidates have non-positive gain (equivalently, include a null candidate with gain $0$), we have $G(c_k;\mathcal{V}_k)\ge 0$ for every $k$.
+Thus $R(\tau_{\mathcal{V}_{k+1}})\le R(\tau_{\mathcal{V}_k})$ for all $k$.
+Since $\widehat{\mathcal{J}}_\lambda$ coincides with $R$ on contract-feasible tokenizers (Eq.~\eqref{eq:relaxed_objective}), the same inequality holds for $\widehat{\mathcal{J}}_\lambda$.
+\end{proof}

@@ -28,7 +28,7 @@ As a result, they may segment across boundary-bearing symbols, entangle role cue
 Conversely, using finer-grained pieces to avoid brittleness often leads to heavy-tailed token lengths on high-cardinality fields, inflating attention cost and truncation risk.
 
 These interface effects appear immediately under standard encoder limits.
-In a scan of six widely used pretrained tokenizers on 5{,}000 CSIC 2010 HTTP requests with $L_{\max}{=}512$, average sequence lengths range from 359--468 tokens and 7--29\% of examples exceed the limit (29.4\% for BERT WordPiece; 7.3\% for a GPT-3.5/GPT-4-family tokenizer).
+In a scan of six widely used pretrained tokenizers on 5{,}000 CSIC 2010 HTTP requests with $L_{\max}{=}512$, average sequence lengths range from 359--468 tokens and 7--29\% of examples exceed the limit (29.4\% for BERT WordPiece; 7.3\% for a GPT-3.5/GPT-4-family tokenizer; Appendix Table~\ref{tab:appendix_e0_tokenizer_playground}).
 The tail is heavy: the longest request reaches 1{,}034 tokens, illustrating that truncation risk is an interface property of segmentation rather than a modeling detail.
 
 % \begin{figure}[t]
@@ -632,14 +632,12 @@ $X_{1:t}$ and $X'_{1:t}$ be two raw prefixes such that
 \[
 \tau(X_{1:t}) = \tau(X'_{1:t}) = Z^{(t)}.
 \]
-Then, for any token-observing predictor $q \in \mathcal{Q}$ and any task loss $\ell$,
-the predictive distribution conditioned on the interface must coincide:
+Then, for any token-observing predictor $q \in \mathcal{Q}$, the predictive distribution conditioned on the interface must coincide:
 \[
 q(\,\cdot \mid Z^{(t)}) \text{ is identical for both prefixes.}
 \]
-Consequently, if the Bayes-optimal semantic states differ,
-$\mathcal{S}(X_{1:t}) \neq \mathcal{S}(X'_{1:t})$,
-then the excess Bayes risk induced by the interface at prefix length $t$ is strictly positive.
+Consequently, if both prefixes occur with nonzero probability and their Bayes-optimal semantic states differ,
+$\mathcal{S}(X_{1:t}) \neq \mathcal{S}(X'_{1:t})$, then for any strictly proper scoring rule $\ell$ (e.g., log loss / cross-entropy) the excess Bayes risk induced by the interface at prefix length $t$ is strictly positive.
 \end{proposition}
 
 Proposition~\ref{prop:irrecoverability} makes explicit that semantic distinctions collapsed by the
@@ -649,13 +647,23 @@ This property underlies the definition of directed semantic distortion in
 Section~\ref{sec:bg_distortion} and motivates optimizing tokenization as an interface-level design problem
 rather than relying on downstream model capacity.
 
+\paragraph{Relaxed objective.}
+Within the contract-feasible set induced by $\mathcal{K}$, we treat semantic fidelity as a hard constraint and optimize only the rate term from the Lagrangian in Eq.~\eqref{eq:lagrangian_objective}.
+We therefore define the relaxed interface objective
+\begin{equation}
+\widehat{\mathcal{J}}_\lambda(\tau_{\mathcal{V}})
+\;\triangleq\;
+R(\tau_{\mathcal{V}}).
+\label{eq:relaxed_objective}
+\end{equation}
+
 \begin{proposition}[Monotonic descent under deployment-aligned greedy construction]
 \label{prop:greedy_descent}
 Let $\widehat{\mathcal{J}}_\lambda$ denote the relaxed interface objective defined in
 Eq.~\eqref{eq:relaxed_objective}, and let
 $\{\mathcal{V}_k\}_{k \ge 0}$ be the sequence of vocabularies produced by
 Algorithm~\ref{alg:cit} under fixed deterministic, prefix-emitting execution semantics.
-Then the relaxed objective is non-increasing along the construction path:
+Then, under the convention that the procedure may perform a no-op update when all candidates have non-positive gain, the relaxed objective is non-increasing along the construction path:
 \[
 \widehat{\mathcal{J}}_\lambda(\tau_{\mathcal{V}_{k+1}})
 \;\le\;
@@ -722,6 +730,9 @@ In contrast, CIT prevents collapse by enforcing role/type integrity at the inter
 The byte-level baseline confirms that the task signal is recoverable under a lossless interface, but at a much higher rate; CIT attains high semantic fidelity at substantially lower interface cost.
 Under semantics-preserving drift, CIT remains stable while baselines degrade, consistent with collapse being an interface property rather than a modeling artifact.
 
+Results are summarized in Table~\ref{tab:e1_synth}.
+\input{results/paper/paper_artifacts/main/tables/e1_synth}
+
 This experiment validates directed semantic distortion as an interface-level metric:
 tokenizers with lower $\widehat{\Delta}(\tau)$ exhibit improved robustness under drift, even under token-fair training budgets.
 
@@ -736,12 +747,29 @@ Under token-fair training, CIT achieves substantially shorter sequences than sta
 Compared to the lossless byte-level baseline, CIT targets similar robustness at a far lower interface cost by enforcing interface constraints rather than relying on lossless tokenization.
 In final test accuracy, CIT is competitive or better under compute-matched budgets, with the largest gains appearing in drift robustness.
 
+Table~\ref{tab:e2_csic_token_fair} summarizes final accuracy, drift accuracy, and token-length statistics under token-fair training.
+\input{results/paper/paper_artifacts/main/tables/e2_csic_token_fair}
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{results/paper/paper_artifacts/main/figures/e2_csic_token_fair_frontier_acc_vs_len.pdf}
+\caption{E2 (CSIC 2010 HTTP) token-fair frontier: accuracy vs.\ average sequence length across tokenizers and model sizes.}
+\label{fig:e2_csic_token_fair_frontier_acc_vs_len}
+\end{figure}
+
 Robustness reveals the interface effect most clearly: under drift, CIT retains its performance while standard subword baselines can suffer large drops.
 Unigram is comparatively robust but less token-efficient under the same budget.
 A step-fair control (appendix) preserves CIT's drift robustness while attenuating accuracy differences, consistent with robustness arising from interface correctness and accuracy gains under token-fair training partially reflecting improved token efficiency.
 
 Beyond final accuracy, learning curves (validation accuracy vs.\ seen encoder tokens) show that CIT reaches strong operating points in fewer tokens and with fewer optimization steps under token-fair budgets.
 This provides an end-to-end notion of \emph{convergence under interface constraints} that complements the interface-only distortion diagnostics.
+
+\input{results/paper/paper_artifacts/main/tables/e2_csic_convergence}
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{results/paper/paper_artifacts/main/figures/e2_csic_token_fair_learning_curves_tiny.pdf}
+\caption{E2 (CSIC 2010 HTTP) token-fair learning curves (Tiny): validation accuracy as a function of seen encoder tokens.}
+\label{fig:e2_csic_token_fair_learning_curves_tiny}
+\end{figure}
 
 \subsection{E3: End-to-End Accuracy--Latency Trade-offs}
 \label{sec:exp_e3}
@@ -752,6 +780,17 @@ On OpenML Adult, we train each (tokenizer, model family) pair end-to-end under a
 CIT reduces average and tail sequence lengths relative to standard subword baselines, yielding consistent latency reductions at matched or improved accuracy.
 The byte-level baseline provides a complementary operating point with high fidelity but higher latency due to its rate.
 Overall, CIT improves operating points on the accuracy--latency and accuracy--parameter frontiers by simultaneously reducing interface cost and preserving task-relevant prefix information (lower surrogate distortion), enabling smaller models to match the accuracy of larger baselines in some regimes.
+
+Results are summarized in Table~\ref{tab:e3_pareto} and Figure~\ref{fig:e3_pareto}.
+\input{results/paper/paper_artifacts/main/tables/e3_pareto}
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.32\linewidth]{results/paper/paper_artifacts/main/figures/e3_pareto_acc_vs_len.pdf}
+\includegraphics[width=0.32\linewidth]{results/paper/paper_artifacts/main/figures/e3_pareto_acc_vs_latency.pdf}
+\includegraphics[width=0.32\linewidth]{results/paper/paper_artifacts/main/figures/e3_pareto_acc_vs_params.pdf}
+\caption{E3 (Pareto slice, Adult): (left) accuracy vs.\ average length, (middle) accuracy vs.\ P95 latency, (right) accuracy vs.\ parameter count.}
+\label{fig:e3_pareto}
+\end{figure}
 
 \subsection{Summary}
 \label{sec:exp_summary}
