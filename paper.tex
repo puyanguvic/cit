@@ -707,7 +707,8 @@ E3 trains end-to-end encoder families on Adult under a 5M-token budget ($L_{\max
 We report average token length (\emph{rate}), tail token length (95th percentile),
 surrogate directed semantic distortion $\widehat{\Delta}(\tau)$,
 classification accuracy, robustness under semantics-preserving re-serialization drift,
-and, where applicable, end-to-end inference latency (95th percentile).
+training dynamics (validation accuracy as a function of seen encoder tokens, including tokens-to-threshold summaries),
+and, where applicable, parameter count and end-to-end inference latency (95th percentile).
 
 \subsection{E1: Does CIT Prevent Prefix Semantic Collapse?}
 \label{sec:exp_e1}
@@ -739,6 +740,9 @@ Robustness reveals the interface effect most clearly: under drift, CIT retains i
 Unigram is comparatively robust but less token-efficient under the same budget.
 A step-fair control (appendix) preserves CIT's drift robustness while attenuating accuracy differences, consistent with robustness arising from interface correctness and accuracy gains under token-fair training partially reflecting improved token efficiency.
 
+Beyond final accuracy, learning curves (validation accuracy vs.\ seen encoder tokens) show that CIT reaches strong operating points in fewer tokens and with fewer optimization steps under token-fair budgets.
+This provides an end-to-end notion of \emph{convergence under interface constraints} that complements the interface-only distortion diagnostics.
+
 \subsection{E3: End-to-End Accuracy--Latency Trade-offs}
 \label{sec:exp_e3}
 
@@ -747,7 +751,7 @@ On OpenML Adult, we train each (tokenizer, model family) pair end-to-end under a
 
 CIT reduces average and tail sequence lengths relative to standard subword baselines, yielding consistent latency reductions at matched or improved accuracy.
 The byte-level baseline provides a complementary operating point with high fidelity but higher latency due to its rate.
-Overall, CIT improves operating points on the accuracy--latency Pareto frontier by simultaneously reducing interface cost and preserving task-relevant prefix information (lower surrogate distortion).
+Overall, CIT improves operating points on the accuracy--latency and accuracy--parameter frontiers by simultaneously reducing interface cost and preserving task-relevant prefix information (lower surrogate distortion), enabling smaller models to match the accuracy of larger baselines in some regimes.
 
 \subsection{Summary}
 \label{sec:exp_summary}
@@ -771,10 +775,10 @@ We formulated tokenization as controlled interface compression under a drop-in r
 We proposed Controlled Interface Tokenization, aligning feasible constraints, vocabulary induction, and deterministic execution.
 Across synthetic and public structured benchmarks, CIT improves rate--distortion trade-offs, downstream accuracy under matched training budgets, and robustness to re-serialization and prefix-limited prediction.
 
-% Appendix moved to a separate file for easier editing.
-\input{appendix}
-
 \section*{Impact Statement}
 
 This work improves efficiency and robustness in structured prediction pipelines under fixed compute budgets.
 Applications should follow responsible data handling and privacy-preserving practices.
+
+% Appendix moved to a separate file for easier editing.
+\input{appendix}

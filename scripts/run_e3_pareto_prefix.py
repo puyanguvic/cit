@@ -181,6 +181,7 @@ def main():
 
         for bb_name, bb_cfg in backbones:
             model = TinyEncoder(vocab_size=args.vocab, n_classes=n_classes, max_len=args.max_len, **bb_cfg)
+            n_params = int(sum(p.numel() for p in model.parameters()))
             model = train_compute_matched(
                 model,
                 train_pairs,
@@ -213,6 +214,8 @@ def main():
                     "p95_len": p95,
                     "distortion_hat": float(dist),
                     "p95_latency_ms": p95_ms,
+                    "n_params": n_params,
+                    "params_m": float(n_params) / 1_000_000.0,
                 }
             )
             print(tok_name, bb_name, "acc", acc, "p95_ms", p95_ms)

@@ -85,7 +85,8 @@ def main():
     ap.set_defaults(auto_download=True, paper=True)
     args = ap.parse_args()
 
-    only = [x.strip().lower() for x in args.only.split(",") if x.strip()]
+    raw_only = [x.strip().lower() for x in args.only.split(",") if x.strip()]
+    only = list(raw_only)
 
     # Backward-compatible aliases.
     alias = {
@@ -117,6 +118,8 @@ def main():
         return out
 
     only = _expand_only(only)
+    if raw_only and not only:
+        raise ValueError(f"Unknown --only entries: {raw_only}")
 
     def enabled(k: str) -> bool:
         if not only:

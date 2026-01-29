@@ -2,7 +2,7 @@
 
 ## Main paper (3 experiments)
 - E1 (synthetic): `main/tables/e1_synth.tex`
-- E2 (CSIC HTTP): `main/tables/e2_csic_token_fair.tex` + `main/figures/e2_csic_token_fair_frontier_acc_vs_len.pdf`
+- E2 (CSIC HTTP): `main/tables/e2_csic_token_fair.tex`, `main/tables/e2_csic_convergence.tex` + `main/figures/e2_csic_token_fair_learning_curves_tiny.pdf`
 - E3 (Pareto slice): `main/tables/e3_pareto.tex` + `main/figures/e3_pareto_*.pdf`
 
 ## Appendix

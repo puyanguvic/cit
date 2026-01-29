@@ -210,6 +210,28 @@ def _first_existing_dir(*candidates: Path) -> Path | None:
     return None
 
 
+def _pick_dir_with_seed_csv(candidates: list[Path], csv_name: str) -> Path | None:
+    """Pick the first candidate that actually contains at least one seed CSV."""
+    for d in candidates:
+        if not d.exists():
+            continue
+        for sd in _seed_dirs(d):
+            if (sd / csv_name).exists():
+                return d
+    # Fallback: any existing directory (even if empty/incomplete).
+    return _first_existing_dir(*candidates)
+
+
+def _pick_dir_with_seed_csv_recursive(candidates: list[Path], csv_name: str) -> Path | None:
+    """Pick the first candidate that contains a seed CSV anywhere under it."""
+    for d in candidates:
+        if not d.exists():
+            continue
+        if _seed_csvs_recursive(d, csv_name):
+            return d
+    return _first_existing_dir(*candidates)
+
+
 def _pick_seed_dir(exp_dir: Path) -> Path | None:
     seeds = _seed_dirs(exp_dir)
     return seeds[0] if seeds else None
@@ -278,6 +300,109 @@ def _plot_e3_pareto(csv_path: Path, out_dir: Path) -> None:
         name="e3_pareto_acc_vs_latency",
     )
 
+    if any("params_m" in r for r in rows):
+        _plot(
+            "params_m",
+            "acc",
+            title="E3 Pareto: Accuracy vs. Parameters",
+            xlabel="params_m (millions)",
+            ylabel="accuracy",
+            name="e3_pareto_acc_vs_params",
+        )
+
+
+def _read_curve_csv(path: Path) -> tuple[list[int], list[float]]:
+    xs: list[int] = []
+    ys: list[float] = []
+    with path.open("r", newline="", encoding="utf-8") as f:
+        r = csv.DictReader(f)
+        for row in r:
+            tok = _to_float(row.get("seen_tokens"))
+            val = _to_float(row.get("val_acc"))
+            if tok is None or val is None:
+                continue
+            xs.append(int(tok))
+            ys.append(float(val))
+    return xs, ys
+
+
+def _t95_tokens(xs: list[int], ys: list[float]) -> int | None:
+    if not xs or not ys:
+        return None
+    best = max(ys)
+    if best <= 0.0:
+        return None
+    target = 0.95 * best
+    # xs are non-decreasing by construction; find first time reaching target.
+    for x, y in sorted(zip(xs, ys), key=lambda t: t[0]):
+        if y >= target:
+            return int(x)
+    return None
+
+
+def _plot_e2_learning_curves_mean(
+    seed_dirs: list[Path],
+    *,
+    mode: str,
+    model_kind: str,
+    total_tokens: int,
+    out_dir: Path,
+    name: str,
+) -> bool:
+    try:
+        import numpy as np
+        import matplotlib.pyplot as plt
+    except Exception:
+        print("[warn] numpy/matplotlib not available; skipping E2 learning-curve plot.")
+        return False
+
+    if not seed_dirs:
+        return False
+
+    # Build a fixed token grid for averaging.
+    total_tokens = int(total_tokens)
+    grid = np.linspace(0.0, float(total_tokens), num=21)
+
+    # Collect per-tokenizer curves across seeds.
+    curves: dict[str, list[tuple[list[int], list[float]]]] = {}
+    for sd in seed_dirs:
+        curves_dir = sd / "curves" / mode
+        if not curves_dir.exists():
+            continue
+        for p in curves_dir.glob(f"curves_{model_kind}_*.csv"):
+            tok = p.stem.split("_", 2)[-1]
+            xs, ys = _read_curve_csv(p)
+            if xs and ys:
+                curves.setdefault(tok, []).append((xs, ys))
+
+    if not curves:
+        return False
+
+    plt.figure()
+    for tok, runs in sorted(curves.items(), key=lambda kv: kv[0]):
+        vals = []
+        for xs, ys in runs:
+            # Interpolate onto grid (use endpoints outside range).
+            xs_np = np.asarray(xs, dtype=np.float64)
+            ys_np = np.asarray(ys, dtype=np.float64)
+            order = np.argsort(xs_np)
+            xs_np = xs_np[order]
+            ys_np = ys_np[order]
+            vals.append(np.interp(grid, xs_np, ys_np, left=float(ys_np[0]), right=float(ys_np[-1])))
+        y_mean = np.mean(np.stack(vals, axis=0), axis=0)
+        plt.plot(grid / 1e6, y_mean, marker="o", linestyle="-", label=tok)
+
+    plt.title(f"E2 CSIC ({mode}) learning curves ({model_kind})")
+    plt.xlabel("seen_tokens (millions)")
+    plt.ylabel("val_acc")
+    plt.legend()
+    plt.tight_layout()
+    out_dir.mkdir(parents=True, exist_ok=True)
+    plt.savefig(out_dir / f"{name}.pdf")
+    plt.savefig(out_dir / f"{name}.png", dpi=200)
+    plt.close()
+    return True
+
 
 def main() -> None:
     ap = argparse.ArgumentParser()
@@ -312,7 +437,7 @@ def main() -> None:
     wrote_figs = 0
 
     # E1 (synthetic)
-    e1_dir = _first_existing_dir(run_root / "e1", run_root / "e1_synth")
+    e1_dir = _pick_dir_with_seed_csv([run_root / "e1", run_root / "e1_synth"], "results.csv")
     if e1_dir is None:
         e1_csvs = []
     else:
@@ -340,8 +465,8 @@ def main() -> None:
         wrote_tables += 1
 
     # E2 (CSIC HTTP): token-fair + step-fair
-    e2_main_dir = _first_existing_dir(run_root / "e2", run_root / "e2_csic_http")
-    e2_step_dir = _first_existing_dir(run_root / "appendix_e2", e2_main_dir) if e2_main_dir else _first_existing_dir(run_root / "appendix_e2")
+    e2_main_dir = _pick_dir_with_seed_csv([run_root / "e2", run_root / "e2_csic_http"], "results_token_fair.csv")
+    e2_step_dir = _pick_dir_with_seed_csv([run_root / "appendix_e2"], "results_step_fair.csv")
 
     e2_token_csvs: list[Path] = []
     if e2_main_dir is not None:
@@ -377,6 +502,73 @@ def main() -> None:
         )
         wrote_tables += 1
 
+        # Convergence diagnostics from learning curves (token-fair).
+        seed_dirs = _seed_dirs(e2_main_dir) if e2_main_dir is not None else []
+        conv_rows: list[dict] = []
+        for sd in seed_dirs:
+            seed_s = sd.name[len("seed") :]
+            try:
+                seed = int(seed_s)
+            except Exception:
+                seed = 0
+            curves_dir = sd / "curves" / "token_fair"
+            if not curves_dir.exists():
+                continue
+            for p in curves_dir.glob("curves_*.csv"):
+                parts = p.stem.split("_")
+                if len(parts) < 3 or parts[0] != "curves":
+                    continue
+                model_kind = parts[1]
+                tok = "_".join(parts[2:])
+                xs, ys = _read_curve_csv(p)
+                t95 = _t95_tokens(xs, ys)
+                if t95 is None:
+                    continue
+                conv_rows.append(
+                    {
+                        "model": model_kind,
+                        "tokenizer": tok,
+                        "t95_tokens_m": float(t95) / 1_000_000.0,
+                        "seed": int(seed),
+                    }
+                )
+        if conv_rows:
+            conv_sum = _group_stats(
+                conv_rows,
+                group_keys=["model", "tokenizer"],
+                metric_keys=["t95_tokens_m"],
+            )
+            _write_latex_table(
+                conv_sum,
+                columns=[
+                    Col("model", "Model", align="l"),
+                    Col("tokenizer", "Tokenizer", align="l"),
+                    Col("t95_tokens_m", "$t_{95}$ (M tokens)", align="r", metric="t95_tokens_m", digits=2),
+                ],
+                out_path=main_tables_dir / "e2_csic_convergence.tex",
+                caption="E2 (CSIC 2010 HTTP) token-fair convergence: tokens to reach 95\\% of best validation accuracy (from learning curves).",
+                label="tab:e2_csic_convergence",
+            )
+            wrote_tables += 1
+
+        # Learning curve figure (mean across seeds, token-fair, Tiny).
+        try:
+            total_tokens = int(
+                max((_to_float(r.get("total_tokens")) or 0.0) for r in e2_token_rows)  # type: ignore[arg-type]
+            )
+        except Exception:
+            total_tokens = 0
+        if total_tokens > 0 and seed_dirs:
+            if _plot_e2_learning_curves_mean(
+                seed_dirs,
+                mode="token_fair",
+                model_kind="tiny",
+                total_tokens=total_tokens,
+                out_dir=main_figs_dir,
+                name="e2_csic_token_fair_learning_curves_tiny",
+            ):
+                wrote_figs += 2
+
     if e2_step_csvs:
         e2_step_rows = _collect_many(e2_step_csvs)
         e2_step_sum = _group_stats(
@@ -401,20 +593,21 @@ def main() -> None:
         wrote_tables += 1
 
     # E3 (Pareto slice)
-    e3_dir = _first_existing_dir(run_root / "e3", run_root / "e3_pareto")
+    e3_dir = _pick_dir_with_seed_csv([run_root / "e3", run_root / "e3_pareto"], "results.csv")
     e3_csvs = [] if e3_dir is None else [p / "results.csv" for p in _seed_dirs(e3_dir) if (p / "results.csv").exists()]
     if e3_csvs:
         e3_rows = _collect_many(e3_csvs)
         e3_sum = _group_stats(
             e3_rows,
             group_keys=["backbone", "tokenizer"],
-            metric_keys=["acc", "avg_len", "p95_len", "distortion_hat", "p95_latency_ms"],
+            metric_keys=["acc", "avg_len", "p95_len", "distortion_hat", "p95_latency_ms", "params_m"],
         )
         _write_latex_table(
             e3_sum,
             columns=[
                 Col("backbone", "Backbone", align="l"),
                 Col("tokenizer", "Tokenizer", align="l"),
+                Col("params_m", "Params (M)", align="r", metric="params_m", digits=2),
                 Col("acc", "Acc.", align="r", metric="acc", digits=3),
                 Col("avg_len", "avg\\_len", align="r", metric="avg_len", digits=1),
                 Col("p95_len", "p95\\_len", align="r", metric="p95_len", digits=0, kind="int"),
@@ -429,7 +622,7 @@ def main() -> None:
 
     # ---- Appendix tables ----
     # E0 (tokenizer playground scan)
-    e0_dir = _first_existing_dir(run_root / "appendix_e1", run_root / "e0_tokenizer_playground")
+    e0_dir = _pick_dir_with_seed_csv([run_root / "appendix_e1", run_root / "e0_tokenizer_playground"], "results.csv")
     e0_csvs = [] if e0_dir is None else [p / "results.csv" for p in _seed_dirs(e0_dir) if (p / "results.csv").exists()]
     if e0_csvs:
         e0_rows = _collect_many(e0_csvs)
@@ -457,7 +650,9 @@ def main() -> None:
         wrote_tables += 1
 
     # Frontier sweep (appendix)
-    frontier_dir = _first_existing_dir(run_root / "appendix_e4", run_root / "appendix_frontier", run_root / "e4_frontier")
+    frontier_dir = _pick_dir_with_seed_csv(
+        [run_root / "appendix_e4", run_root / "appendix_frontier", run_root / "e4_frontier"], "results.csv"
+    )
     if frontier_dir is not None:
         frontier_csvs = [p / "results.csv" for p in _seed_dirs(frontier_dir) if (p / "results.csv").exists()]
         if frontier_csvs:
@@ -485,7 +680,7 @@ def main() -> None:
             wrote_tables += 1
 
     # UCI appendix
-    uci_dir = _first_existing_dir(run_root / "appendix_e3", run_root / "appendix_uci", run_root / "e2_uci")
+    uci_dir = _pick_dir_with_seed_csv_recursive([run_root / "appendix_e3", run_root / "appendix_uci", run_root / "e2_uci"], "results.csv")
     if uci_dir is not None:
         uci_csvs = _seed_csvs_recursive(uci_dir, "results.csv")
         if uci_csvs:
@@ -570,7 +765,9 @@ def main() -> None:
     manifest_lines.append("")
     manifest_lines.append("## Main paper (3 experiments)")
     manifest_lines.append("- E1 (synthetic): `main/tables/e1_synth.tex`")
-    manifest_lines.append("- E2 (CSIC HTTP): `main/tables/e2_csic_token_fair.tex` + `main/figures/e2_csic_token_fair_frontier_acc_vs_len.pdf`")
+    manifest_lines.append(
+        "- E2 (CSIC HTTP): `main/tables/e2_csic_token_fair.tex`, `main/tables/e2_csic_convergence.tex` + `main/figures/e2_csic_token_fair_learning_curves_tiny.pdf`"
+    )
     manifest_lines.append("- E3 (Pareto slice): `main/tables/e3_pareto.tex` + `main/figures/e3_pareto_*.pdf`")
     manifest_lines.append("")
     manifest_lines.append("## Appendix")

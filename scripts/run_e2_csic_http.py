@@ -374,6 +374,7 @@ def main():
                 acc = evaluate(model, test_pairs, pad_id, args.max_len, device=args.device)
                 drift_acc = evaluate(model, drift_pairs, pad_id, args.max_len, device=args.device)
 
+                n_params = int(sum(p.numel() for p in model.parameters()))
                 curves_path = curves_root / mode / f"curves_{model_kind}_{tok_name}.csv"
                 _write_curves(curve_rows, curves_path)
 
@@ -386,6 +387,8 @@ def main():
                     "drift_acc": float(drift_acc),
                     "avg_len": float(data["avg_len"]),
                     "p95_len": int(data["p95_len"]),
+                    "n_params": n_params,
+                    "params_m": float(n_params) / 1_000_000.0,
                     "vocab": int(args.vocab),
                     "max_len": int(args.max_len),
                     "total_tokens": int(args.total_tokens),
