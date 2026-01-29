@@ -747,12 +747,12 @@ Under token-fair training, CIT achieves substantially shorter sequences than sta
 Compared to the lossless byte-level baseline, CIT targets similar robustness at a far lower interface cost by enforcing interface constraints rather than relying on lossless tokenization.
 In final test accuracy, CIT is competitive or better under compute-matched budgets, with the largest gains appearing in drift robustness.
 
-Table~\ref{tab:e2_csic_token_fair} summarizes final accuracy, drift accuracy, and token-length statistics under token-fair training.
+Table~\ref{tab:e2_csic_token_fair} summarizes final accuracy, drift accuracy, and token-length statistics under token-fair training, and Figure~\ref{fig:e2_csic_token_fair_frontier_acc_vs_len} shows the resulting accuracy--length frontier.
 \input{results/paper/paper_artifacts/main/tables/e2_csic_token_fair}
 \begin{figure}[t]
 \centering
-\includegraphics[width=\linewidth]{results/paper/paper_artifacts/main/figures/e2_csic_token_fair_frontier_acc_vs_len.pdf}
-\caption{E2 (CSIC 2010 HTTP) token-fair frontier: accuracy vs.\ average sequence length across tokenizers and model sizes.}
+\includegraphics[width=\linewidth]{paper_figures/e2_csic_token_fair_frontier_acc_vs_len.pdf}
+\caption{E2 (CSIC 2010 HTTP) token-fair frontier (10M tokens, $L_{\max}{=}512$): accuracy vs.\ average sequence length across tokenizers and model sizes.}
 \label{fig:e2_csic_token_fair_frontier_acc_vs_len}
 \end{figure}
 
@@ -760,14 +760,14 @@ Robustness reveals the interface effect most clearly: under drift, CIT retains i
 Unigram is comparatively robust but less token-efficient under the same budget.
 A step-fair control (appendix) preserves CIT's drift robustness while attenuating accuracy differences, consistent with robustness arising from interface correctness and accuracy gains under token-fair training partially reflecting improved token efficiency.
 
-Beyond final accuracy, learning curves (validation accuracy vs.\ seen encoder tokens) show that CIT reaches strong operating points in fewer tokens and with fewer optimization steps under token-fair budgets.
+Beyond final accuracy, learning curves (validation accuracy vs.\ seen encoder tokens) show that CIT reaches strong operating points in fewer tokens and with fewer optimization steps under token-fair budgets (Figure~\ref{fig:e2_csic_token_fair_learning_curves_tiny}).
 This provides an end-to-end notion of \emph{convergence under interface constraints} that complements the interface-only distortion diagnostics.
 
 \input{results/paper/paper_artifacts/main/tables/e2_csic_convergence}
 \begin{figure}[t]
 \centering
-\includegraphics[width=\linewidth]{results/paper/paper_artifacts/main/figures/e2_csic_token_fair_learning_curves_tiny.pdf}
-\caption{E2 (CSIC 2010 HTTP) token-fair learning curves (Tiny): validation accuracy as a function of seen encoder tokens.}
+\includegraphics[width=\linewidth]{paper_figures/e2_csic_token_fair_learning_curves_tiny.pdf}
+\caption{E2 (CSIC 2010 HTTP) token-fair learning curves (Tiny, 10M tokens, $L_{\max}{=}512$): validation accuracy as a function of seen encoder tokens.}
 \label{fig:e2_csic_token_fair_learning_curves_tiny}
 \end{figure}
 
@@ -785,9 +785,11 @@ Results are summarized in Table~\ref{tab:e3_pareto} and Figure~\ref{fig:e3_paret
 \input{results/paper/paper_artifacts/main/tables/e3_pareto}
 \begin{figure}[t]
 \centering
-\includegraphics[width=0.32\linewidth]{results/paper/paper_artifacts/main/figures/e3_pareto_acc_vs_len.pdf}
-\includegraphics[width=0.32\linewidth]{results/paper/paper_artifacts/main/figures/e3_pareto_acc_vs_latency.pdf}
-\includegraphics[width=0.32\linewidth]{results/paper/paper_artifacts/main/figures/e3_pareto_acc_vs_params.pdf}
+\includegraphics[width=0.32\linewidth]{paper_figures/e3_pareto_acc_vs_len.pdf}
+\hfill
+\includegraphics[width=0.32\linewidth]{paper_figures/e3_pareto_acc_vs_latency.pdf}
+\hfill
+\includegraphics[width=0.32\linewidth]{paper_figures/e3_pareto_acc_vs_params.pdf}
 \caption{E3 (Pareto slice, Adult): (left) accuracy vs.\ average length, (middle) accuracy vs.\ P95 latency, (right) accuracy vs.\ parameter count.}
 \label{fig:e3_pareto}
 \end{figure}

@@ -40,13 +40,16 @@ Finally, we sweep vocabulary budgets to trace empirical rate--distortion and acc
 For each vocabulary size, we train each tokenizer on the same training serialization and evaluate (avg./P95) token length, surrogate distortion $\widehat{\Delta}(\tau)$, and end-to-end accuracy under a fixed encoder-token budget.
 This sweep illustrates how interface constraints and distortion-aware induction shift the frontier, yielding better operating points under tight budgets.
 
+Table~\ref{tab:appendix_frontier} reports the aggregated sweep results, and Figure~\ref{fig:appendix_frontier} visualizes the corresponding frontiers and runtime trade-offs.
 \input{results/paper/paper_artifacts/appendix/tables/frontier}
 \begin{figure}[t]
 \centering
-\includegraphics[width=0.48\linewidth]{results/paper/paper_artifacts/appendix/figures/frontier_acc_vs_len.pdf}
-\includegraphics[width=0.48\linewidth]{results/paper/paper_artifacts/appendix/figures/frontier_acc_vs_distortion.pdf}
-\includegraphics[width=0.48\linewidth]{results/paper/paper_artifacts/appendix/figures/frontier_len_vs_distortion.pdf}
-\includegraphics[width=0.48\linewidth]{results/paper/paper_artifacts/appendix/figures/frontier_tokenize_ms_vs_len.pdf}
+\includegraphics[width=0.48\linewidth]{paper_figures/frontier_acc_vs_len.pdf}
+\hfill
+\includegraphics[width=0.48\linewidth]{paper_figures/frontier_acc_vs_distortion.pdf}\\
+\includegraphics[width=0.48\linewidth]{paper_figures/frontier_len_vs_distortion.pdf}
+\hfill
+\includegraphics[width=0.48\linewidth]{paper_figures/frontier_tokenize_ms_vs_len.pdf}
 \caption{Appendix: vocabulary-budget frontier sweep plots.}
 \label{fig:appendix_frontier}
 \end{figure}
