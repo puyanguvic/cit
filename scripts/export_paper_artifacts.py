@@ -21,6 +21,54 @@ from pathlib import Path
 from typing import Iterable
 
 
+TOKENIZER_COLORS: dict[str, str] = {
+    "BPE": "#0072B2",
+    "Bytes": "#E69F00",
+    "CIT": "#009E73",
+    "Unigram": "#D55E00",
+    "WordPiece": "#CC79A7",
+}
+
+BACKBONE_MARKERS: dict[str, str] = {
+    "tiny": "o",
+    "mini": "o",
+    "small": "s",
+    "base": "^",
+}
+
+
+def _apply_mpl_style() -> None:
+    try:
+        import matplotlib.pyplot as plt
+    except Exception:
+        return
+
+    try:
+        plt.style.use("seaborn-v0_8-whitegrid")
+    except Exception:
+        pass
+    plt.rcParams.update(
+        {
+            "figure.dpi": 150,
+            "savefig.dpi": 300,
+            "axes.spines.top": False,
+            "axes.spines.right": False,
+            "axes.grid": True,
+            "grid.alpha": 0.25,
+            "grid.linestyle": "-",
+            "font.size": 10,
+            "axes.labelsize": 10,
+            "legend.fontsize": 9,
+            "xtick.labelsize": 9,
+            "ytick.labelsize": 9,
+        }
+    )
+
+
+def _tokenizer_color(name: str) -> str:
+    return TOKENIZER_COLORS.get(name, "#333333")
+
+
 def _read_csv(path: Path) -> list[dict]:
     with path.open("r", newline="", encoding="utf-8") as f:
         r = csv.DictReader(f)
@@ -240,6 +288,7 @@ def _pick_seed_dir(exp_dir: Path) -> Path | None:
 def _plot_e3_pareto(csv_path: Path, out_dir: Path) -> None:
     try:
         import matplotlib.pyplot as plt
+        from matplotlib.lines import Line2D
     except Exception:
         print("[warn] matplotlib not available; skipping E3 plots.")
         return
@@ -247,6 +296,7 @@ def _plot_e3_pareto(csv_path: Path, out_dir: Path) -> None:
     if not csv_path.exists():
         return
 
+    _apply_mpl_style()
     rows = _read_csv(csv_path)
     if not rows:
         return
@@ -257,58 +307,141 @@ def _plot_e3_pareto(csv_path: Path, out_dir: Path) -> None:
             out.setdefault(str(r.get(key, "NA")), []).append(r)
         return out
 
-    def _plot(x_key: str, y_key: str, *, title: str, xlabel: str, ylabel: str, name: str) -> None:
-        groups = _group(rows, "tokenizer")
-        plt.figure()
-        for tok, rs in sorted(groups.items()):
-            xs = [_to_float(r.get(x_key)) for r in rs]
-            ys = [_to_float(r.get(y_key)) for r in rs]
-            pairs = sorted([(x, y, str(r.get("backbone", ""))) for (x, y), r in zip(zip(xs, ys), rs) if x is not None and y is not None], key=lambda t: t[0])
-            if not pairs:
-                continue
-            xs2 = [p[0] for p in pairs]
-            ys2 = [p[1] for p in pairs]
-            plt.plot(xs2, ys2, marker="o", linestyle="-", label=tok)
-            for x, y, bb in pairs:
-                if bb:
-                    plt.annotate(bb, (x, y), textcoords="offset points", xytext=(4, 4), fontsize=8)
+    # Stable ordering for consistent aesthetics across runs.
+    tokenizers = sorted({str(r.get("tokenizer", "")) for r in rows if str(r.get("tokenizer", ""))})
+    tokenizers = sorted(tokenizers, key=lambda n: (0, n) if n in TOKENIZER_COLORS else (1, n))
+    backbones = sorted({str(r.get("backbone", "")) for r in rows if str(r.get("backbone", ""))})
 
-        plt.title(title)
-        plt.xlabel(xlabel)
-        plt.ylabel(ylabel)
-        plt.legend()
-        plt.tight_layout()
-        out_dir.mkdir(parents=True, exist_ok=True)
-        plt.savefig(out_dir / f"{name}.pdf")
-        plt.savefig(out_dir / f"{name}.png", dpi=200)
-        plt.close()
+    # Build quick lookup by (tokenizer, backbone).
+    by_key: dict[tuple[str, str], dict] = {}
+    for r in rows:
+        tok = str(r.get("tokenizer", ""))
+        bb = str(r.get("backbone", ""))
+        if tok and bb:
+            by_key[(tok, bb)] = r
 
-    _plot(
+    def _scatter(ax, x_key: str, y_key: str, *, xlabel: str, ylabel: str) -> None:
+        xs_all: list[float] = []
+        ys_all: list[float] = []
+        for tok in tokenizers:
+            color = _tokenizer_color(tok)
+            for bb in backbones:
+                r = by_key.get((tok, bb))
+                if r is None:
+                    continue
+                x = _to_float(r.get(x_key))
+                y = _to_float(r.get(y_key))
+                if x is None or y is None:
+                    continue
+                xs_all.append(float(x))
+                ys_all.append(float(y))
+                marker = BACKBONE_MARKERS.get(bb, "o")
+                ax.scatter(
+                    [float(x)],
+                    [float(y)],
+                    s=46,
+                    marker=marker,
+                    color=color,
+                    edgecolors="white",
+                    linewidths=0.6,
+                    zorder=3,
+                )
+
+        if xs_all:
+            x0, x1 = min(xs_all), max(xs_all)
+            pad = 0.03 * max(1e-9, (x1 - x0))
+            ax.set_xlim(x0 - pad, x1 + pad)
+        if ys_all:
+            y0, y1 = min(ys_all), max(ys_all)
+            pad = 0.06 * max(1e-9, (y1 - y0))
+            ax.set_ylim(y0 - pad, y1 + pad)
+        ax.set_xlabel(xlabel)
+        ax.set_ylabel(ylabel)
+
+    have_params = any("params_m" in r for r in rows)
+
+    # Triptych (publication-ready).
+    fig, axes = plt.subplots(1, 3 if have_params else 2, figsize=(10.4 if have_params else 7.0, 3.1))
+    try:
+        axes_list = list(axes)  # type: ignore[arg-type]
+    except TypeError:
+        axes_list = [axes]  # type: ignore[list-item]
+    axes = axes_list
+
+    _scatter(
+        axes[0],
         "avg_len",
         "acc",
-        title="E3 Pareto: Accuracy vs. Rate",
         xlabel="avg_len (tokens/sample)",
         ylabel="accuracy",
-        name="e3_pareto_acc_vs_len",
     )
-    _plot(
+    axes[0].set_title("Rate")
+
+    _scatter(
+        axes[1],
         "p95_latency_ms",
         "acc",
-        title="E3 Pareto: Accuracy vs. Latency (p95)",
-        xlabel="p95_latency_ms",
+        xlabel="p95 latency (ms)",
         ylabel="accuracy",
-        name="e3_pareto_acc_vs_latency",
     )
+    axes[1].set_title("Latency")
 
-    if any("params_m" in r for r in rows):
-        _plot(
+    if have_params and len(axes) >= 3:
+        _scatter(
+            axes[2],
             "params_m",
             "acc",
-            title="E3 Pareto: Accuracy vs. Parameters",
-            xlabel="params_m (millions)",
+            xlabel="params (M)",
             ylabel="accuracy",
-            name="e3_pareto_acc_vs_params",
         )
+        axes[2].set_title("Parameters")
+
+    tok_handles = [
+        Line2D([0], [0], marker="o", color=_tokenizer_color(tok), linestyle="None", label=tok) for tok in tokenizers
+    ]
+    bb_handles = [
+        Line2D([0], [0], marker=BACKBONE_MARKERS.get(bb, "o"), color="black", linestyle="None", label=bb)
+        for bb in backbones
+    ]
+
+    leg1 = fig.legend(
+        handles=tok_handles,
+        loc="upper center",
+        bbox_to_anchor=(0.5, 1.15),
+        ncol=min(5, len(tok_handles)),
+        frameon=False,
+    )
+    fig.add_artist(leg1)
+    fig.legend(handles=bb_handles, loc="upper right", bbox_to_anchor=(0.995, 1.15), frameon=False)
+
+    fig.tight_layout(rect=(0.0, 0.0, 1.0, 0.98))
+    out_dir.mkdir(parents=True, exist_ok=True)
+    fig.savefig(out_dir / "e3_pareto_triptych.pdf", bbox_inches="tight")
+    fig.savefig(out_dir / "e3_pareto_triptych.png", dpi=220, bbox_inches="tight")
+    plt.close(fig)
+
+    # Keep per-metric panels for convenience/backward compatibility.
+    def _single(name: str, x_key: str, xlabel: str) -> None:
+        fig, ax = plt.subplots(figsize=(6.6, 3.2))
+        _scatter(ax, x_key, "acc", xlabel=xlabel, ylabel="accuracy")
+        leg1 = ax.legend(
+            handles=tok_handles,
+            loc="upper center",
+            bbox_to_anchor=(0.5, 1.18),
+            ncol=min(5, len(tok_handles)),
+            frameon=False,
+        )
+        ax.add_artist(leg1)
+        ax.legend(handles=bb_handles, loc="lower right", frameon=False)
+        fig.tight_layout()
+        fig.savefig(out_dir / f"{name}.pdf", bbox_inches="tight")
+        fig.savefig(out_dir / f"{name}.png", dpi=220, bbox_inches="tight")
+        plt.close(fig)
+
+    _single("e3_pareto_acc_vs_len", "avg_len", "avg_len (tokens/sample)")
+    _single("e3_pareto_acc_vs_latency", "p95_latency_ms", "p95 latency (ms)")
+    if have_params:
+        _single("e3_pareto_acc_vs_params", "params_m", "params (M)")
 
 
 def _read_curve_csv(path: Path) -> tuple[list[int], list[float]]:
@@ -359,6 +492,8 @@ def _plot_e2_learning_curves_mean(
     if not seed_dirs:
         return False
 
+    _apply_mpl_style()
+
     # Build a fixed token grid for averaging.
     total_tokens = int(total_tokens)
     grid = np.linspace(0.0, float(total_tokens), num=21)
@@ -378,8 +513,10 @@ def _plot_e2_learning_curves_mean(
     if not curves:
         return False
 
-    plt.figure()
-    for tok, runs in sorted(curves.items(), key=lambda kv: kv[0]):
+    fig, ax = plt.subplots(figsize=(6.6, 3.2))
+    tok_names = sorted(curves.keys(), key=lambda n: (0, n) if n in TOKENIZER_COLORS else (1, n))
+    for tok in tok_names:
+        runs = curves[tok]
         vals = []
         for xs, ys in runs:
             # Interpolate onto grid (use endpoints outside range).
@@ -390,17 +527,18 @@ def _plot_e2_learning_curves_mean(
             ys_np = ys_np[order]
             vals.append(np.interp(grid, xs_np, ys_np, left=float(ys_np[0]), right=float(ys_np[-1])))
         y_mean = np.mean(np.stack(vals, axis=0), axis=0)
-        plt.plot(grid / 1e6, y_mean, marker="o", linestyle="-", label=tok)
+        ax.plot(grid / 1e6, y_mean, linestyle="-", linewidth=2.2, color=_tokenizer_color(tok), label=tok)
 
-    plt.title(f"E2 CSIC ({mode}) learning curves ({model_kind})")
-    plt.xlabel("seen_tokens (millions)")
-    plt.ylabel("val_acc")
-    plt.legend()
-    plt.tight_layout()
+    ax.set_xlabel("seen tokens (M)")
+    ax.set_ylabel("validation accuracy")
+    ax.set_xlim(0.0, float(total_tokens) / 1e6)
+    ax.legend(loc="upper center", bbox_to_anchor=(0.5, 1.18), ncol=min(5, len(tok_names)), frameon=False)
+
+    fig.tight_layout()
     out_dir.mkdir(parents=True, exist_ok=True)
-    plt.savefig(out_dir / f"{name}.pdf")
-    plt.savefig(out_dir / f"{name}.png", dpi=200)
-    plt.close()
+    fig.savefig(out_dir / f"{name}.pdf", bbox_inches="tight")
+    fig.savefig(out_dir / f"{name}.png", dpi=220, bbox_inches="tight")
+    plt.close(fig)
     return True
 
 
@@ -768,7 +906,9 @@ def main() -> None:
     manifest_lines.append(
         "- E2 (CSIC HTTP): `main/tables/e2_csic_token_fair.tex`, `main/tables/e2_csic_convergence.tex` + `main/figures/e2_csic_token_fair_learning_curves_tiny.pdf`"
     )
-    manifest_lines.append("- E3 (Pareto slice): `main/tables/e3_pareto.tex` + `main/figures/e3_pareto_*.pdf`")
+    manifest_lines.append(
+        "- E3 (Pareto slice): `main/tables/e3_pareto.tex` + `main/figures/e3_pareto_triptych.pdf` (and per-metric `e3_pareto_*.pdf`)"
+    )
     manifest_lines.append("")
     manifest_lines.append("## Appendix")
     manifest_lines.append("- Tokenizer scan (E0): `appendix/tables/e0_tokenizer_playground.tex` (if present)")

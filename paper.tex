@@ -794,7 +794,7 @@ tiny & WordPiece & 0.895 & 0.477 & 329.4 & 526 \\
 \begin{figure}[t]
 \centering
 \includegraphics[width=\linewidth]{Figs/e2_csic_token_fair_frontier_acc_vs_len.pdf}
-\caption{E2 (CSIC 2010 HTTP) token-fair frontier (10M tokens, $L_{\max}{=}512$): accuracy vs.\ average sequence length across tokenizers and model sizes.}
+\caption{E2 (CSIC 2010 HTTP) token-fair frontier (10M tokens, $L_{\max}{=}512$): accuracy vs.\ average sequence length. Filled markers show test accuracy and hollow markers show drift accuracy under semantics-preserving re-serialization; vertical segments visualize the robustness gap. Colors denote tokenizers and marker shapes denote model size.}
 \label{fig:e2_csic_token_fair_frontier_acc_vs_len}
 \end{figure}
 
@@ -872,12 +872,8 @@ small & WordPiece & 11.63 & 0.761 & 106.4 & 112 & 0.186 & 6.07 \\
 
 \begin{figure*}[t]
 \centering
-\includegraphics[width=0.32\linewidth]{Figs/e3_pareto_acc_vs_len.pdf}
-\hfill
-\includegraphics[width=0.32\linewidth]{Figs/e3_pareto_acc_vs_latency.pdf}
-\hfill
-\includegraphics[width=0.32\linewidth]{Figs/e3_pareto_acc_vs_params.pdf}
-\caption{E3 (Pareto slice, Adult): (left) accuracy vs.\ average length, (middle) accuracy vs.\ P95 latency, (right) accuracy vs.\ parameter count.}
+\includegraphics[width=\linewidth]{Figs/e3_pareto_triptych.pdf}
+\caption{E3 (Pareto slice, Adult): (left) accuracy vs.\ average length, (middle) accuracy vs.\ P95 latency, (right) accuracy vs.\ parameter count. Colors denote tokenizers and marker shapes denote model backbone.}
 \label{fig:e3_pareto}
 \end{figure*}
 
