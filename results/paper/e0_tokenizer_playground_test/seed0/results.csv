@@ -1,0 +1,7 @@
+dataset,split,n,tokenizer,hf_id,ok,tok_class,is_fast,vocab_size,avg_len,max_len,p50_len,p90_len,p95_len,p99_len,trunc_rate_at_max_len,tokenize_ms_per_sample,error
+csic2010,test,200,bert-base-cased,bert-base-cased,1,BertTokenizer,1,28996,452.925,886,406,602,681,815,0.215,0.1917132269591093,
+csic2010,test,200,gpt2,gpt2,1,GPT2Tokenizer,1,50257,399.13,800,356,547,621,745,0.18,0.20435822196304798,
+csic2010,test,200,cl100k,gugarosa/cl100k_base,0,,,,,,,,,,,,"OSError: We couldn't connect to 'https://huggingface.co' to load the files, and couldn't find them in the cached files.
+Check your internet connection or see how to run the library in offline mode at 'https://huggingface.co/docs/transformers/installation#offline-mode'."
+csic2010,test,200,grok1,Xenova/grok-1-tokenizer,0,,,,,,,,,,,,"OSError: We couldn't connect to 'https://huggingface.co' to load the files, and couldn't find them in the cached files.
+Check your internet connection or see how to run the library in offline mode at 'https://huggingface.co/docs/transformers/installation#offline-mode'."

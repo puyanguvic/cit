@@ -1,0 +1,38 @@
+{
+  "frontier": [
+    {
+      "dataset": "csic2010",
+      "model": "small",
+      "tokenizer": "CIT",
+      "budget_mode": "step_fair",
+      "acc": 0.9132,
+      "drift_acc": 0.9132,
+      "avg_len": 216.9894,
+      "p95_len": 416,
+      "vocab": 2048,
+      "max_len": 512,
+      "total_tokens": 10000000,
+      "total_steps": 959,
+      "majority_train_frac": 0.54165,
+      "majority_test_acc": 0.5576,
+      "seed": 0
+    },
+    {
+      "dataset": "csic2010",
+      "model": "small",
+      "tokenizer": "WordPiece",
+      "budget_mode": "step_fair",
+      "acc": 0.9276,
+      "drift_acc": 0.4976,
+      "avg_len": 329.4426,
+      "p95_len": 526,
+      "vocab": 2048,
+      "max_len": 512,
+      "total_tokens": 10000000,
+      "total_steps": 959,
+      "majority_train_frac": 0.54165,
+      "majority_test_acc": 0.5576,
+      "seed": 0
+    }
+  ]
+}

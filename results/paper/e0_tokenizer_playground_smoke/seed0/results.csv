@@ -1,0 +1,7 @@
+dataset,split,n,tokenizer,hf_id,ok,tok_class,is_fast,vocab_size,avg_len,max_len,p50_len,p90_len,p95_len,p99_len,trunc_rate_at_max_len,tokenize_ms_per_sample
+csic2010,test,200,bert-base-cased,bert-base-cased,1,BertTokenizer,1,28996,452.925,886,406,602,681,815,0.215,0.19461758434772491
+csic2010,test,200,gpt2,gpt2,1,GPT2Tokenizer,1,50257,399.13,800,356,547,621,745,0.18,0.17849468626081944
+csic2010,test,200,gpt3,Xenova/text-davinci-003,1,TokenizersBackend,1,50281,398.95,800,356,547,621,745,0.175,0.18357526045292616
+csic2010,test,200,gpt35,Xenova/gpt-3.5-turbo,1,GPT2Tokenizer,1,100261,346.535,713,310,460,544,666,0.065,0.21128682885318995
+csic2010,test,200,gpt4,Xenova/gpt-4,1,GPT2Tokenizer,1,100263,346.535,713,310,460,544,666,0.065,0.2049380587413907
+csic2010,test,200,grok1,Xenova/grok-1-tokenizer,1,LlamaTokenizer,1,131072,361.085,725,322,495,554,701,0.08,0.1077778497710824

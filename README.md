@@ -16,7 +16,7 @@ source .venv/bin/activate
 pip install -e .
 ```
 
-This repository ignores local bytecode caches and experiment outputs via `.gitignore` (e.g., `__pycache__/`, `*.pyc`, `results/`).
+This repository ignores local bytecode caches and heavyweight model caches via `.gitignore` (e.g., `__pycache__/`, `*.pyc`, `.venv/`, `results/hf_cache/`).
 
 ## Experiments
 

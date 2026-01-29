@@ -14,8 +14,12 @@ dist/
 *.egg-info/
 
 # Experiment outputs / logs
-results/
+# Track paper/curated outputs under results/, but ignore heavyweight caches.
+results/hf_cache/
+
+# JSONL logs (tracked under results/, ignored elsewhere)
 *.jsonl
+!results/**/*.jsonl
 *.pt
 *.pth
 *.ckpt
