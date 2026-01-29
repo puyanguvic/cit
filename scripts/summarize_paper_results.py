@@ -46,6 +46,21 @@ def _seed_dirs(exp_dir: Path) -> list[Path]:
     return sorted(out, key=lambda p: p.name)
 
 
+def _pick_dir_with_seed_csv(candidates: list[Path], csv_name: str) -> Path | None:
+    """Pick the first candidate that contains at least one seed CSV."""
+    for d in candidates:
+        if not d.exists():
+            continue
+        for sd in _seed_dirs(d):
+            if (sd / csv_name).exists():
+                return d
+    return None
+
+
+def _collect_seed_csvs(exp_dir: Path, csv_name: str) -> list[Path]:
+    return [p / csv_name for p in _seed_dirs(exp_dir) if (p / csv_name).exists()]
+
+
 def _group_stats(rows: list[dict], *, group_keys: list[str], metric_keys: list[str]) -> list[dict]:
     buckets: dict[tuple[str, ...], list[dict]] = {}
     for r in rows:
@@ -98,8 +113,8 @@ def main() -> None:
     outdir = Path(args.outdir) if args.outdir else (run_root / "summary")
 
     # E1
-    e1_dir = run_root / "e1_synth"
-    e1_csvs = [p / "results.csv" for p in _seed_dirs(e1_dir) if (p / "results.csv").exists()]
+    e1_dir = _pick_dir_with_seed_csv([run_root / "e1", run_root / "e1_synth"], "results.csv")
+    e1_csvs = [] if e1_dir is None else _collect_seed_csvs(e1_dir, "results.csv")
     e1_rows = _collect_many(e1_csvs)
     e1_sum = _group_stats(
         e1_rows,
@@ -109,9 +124,18 @@ def main() -> None:
     _write_csv(e1_sum, outdir / "e1_summary.csv")
 
     # E2 (token-fair + step-fair)
-    e2_dir = run_root / "e2_csic_http"
-    e2_token_csvs = [p / "results_token_fair.csv" for p in _seed_dirs(e2_dir) if (p / "results_token_fair.csv").exists()]
-    e2_step_csvs = [p / "results_step_fair.csv" for p in _seed_dirs(e2_dir) if (p / "results_step_fair.csv").exists()]
+    e2_token_dir = _pick_dir_with_seed_csv(
+        [run_root / "e2", run_root / "e2_csic_http", run_root / "e5_csic_http"],
+        "results_token_fair.csv",
+    )
+    e2_token_csvs = [] if e2_token_dir is None else _collect_seed_csvs(e2_token_dir, "results_token_fair.csv")
+    # Step-fair runs are normally placed under appendix_e2 by run_all.py.
+    e2_step_dir = _pick_dir_with_seed_csv(
+        [run_root / "appendix_e2", run_root / "e2_csic_http", run_root / "e5_csic_http"],
+        "results_step_fair.csv",
+    )
+    e2_step_csvs = [] if e2_step_dir is None else _collect_seed_csvs(e2_step_dir, "results_step_fair.csv")
+
     e2_token_rows = _collect_many(e2_token_csvs)
     e2_step_rows = _collect_many(e2_step_csvs)
 
@@ -130,8 +154,8 @@ def main() -> None:
     _write_csv(e2_step_sum, outdir / "e2_step_fair_summary.csv")
 
     # E3
-    e3_dir = run_root / "e3_pareto"
-    e3_csvs = [p / "results.csv" for p in _seed_dirs(e3_dir) if (p / "results.csv").exists()]
+    e3_dir = _pick_dir_with_seed_csv([run_root / "e3", run_root / "e3_pareto"], "results.csv")
+    e3_csvs = [] if e3_dir is None else _collect_seed_csvs(e3_dir, "results.csv")
     e3_rows = _collect_many(e3_csvs)
     e3_sum = _group_stats(
         e3_rows,
@@ -145,4 +169,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

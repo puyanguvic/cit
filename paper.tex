@@ -729,7 +729,8 @@ We evaluate (i) surrogate directed semantic distortion (prefix-level information
 
 This task exhibits a clear interface failure mode: standard subword tokenizers can induce prefix semantic collapse, driving accuracy toward chance despite compute-matched training.
 In contrast, CIT prevents collapse by enforcing role/type integrity at the interface, achieving high accuracy and substantially lower surrogate distortion.
-The byte-level baseline confirms that the task signal is recoverable under a lossless interface, but at a much higher rate; CIT attains high semantic fidelity at substantially lower interface cost.
+The byte-level baseline is lossless but extremely high-rate; under a strict length cap and compute-matched training, it suffers severe truncation and low downstream accuracy.
+CIT attains high semantic fidelity at substantially lower interface cost.
 Under semantics-preserving drift, CIT remains stable while baselines degrade, consistent with collapse being an interface property rather than a modeling artifact.
 
 Results are summarized in Table~\ref{tab:e1_synth}.
@@ -741,19 +742,18 @@ Results are summarized in Table~\ref{tab:e1_synth}.
 \toprule
 Tokenizer & Test acc. & Drift acc. & Rate $\mathbb{E}[|Z|]$ & Distortion $\hat{\Delta}$ \\
 \midrule
-BPE & 0.049 & 0.045 & 644.9 & 0.749 \\
-Bytes & 0.042 & 0.041 & 1057.9 & 0.453 \\
-CIT & 1.000 & 0.826 & 81.0 & 0.295 \\
-Unigram & 0.056 & 0.053 & 691.7 & 0.667 \\
-WordPiece & 0.045 & 0.027 & 648.0 & 0.663 \\
+BPE & 0.049 & 0.045 & 644.9 & 2.411 \\
+Bytes & 0.042 & 0.041 & 1057.9 & 2.289 \\
+CIT & 1.000 & 0.826 & 81.0 & 1.200 \\
+Unigram & 0.056 & 0.052 & 691.7 & 2.400 \\
+WordPiece & 0.044 & 0.029 & 648.1 & 2.410 \\
 \bottomrule
 \end{tabular}
-\caption{E1 (synthetic) summary across seeds.}
+\caption{E1 (synthetic) summary (seed0).}
 \label{tab:e1_synth}
 \end{table}
 
-This experiment validates directed semantic distortion as an interface-level metric:
-tokenizers with lower $\widehat{\Delta}(\tau)$ exhibit improved robustness under drift, even under token-fair training budgets.
+This experiment highlights a rate--distortion trade-off under prefix-emitting interfaces: compared to budget-matched subword tokenizers, CIT attains substantially lower $\widehat{\Delta}(\tau)$ and correspondingly better drift robustness, while remaining far more token-efficient than the lossless bytes interface.
 
 \subsection{E2: Token-Fair End-to-End Learning on CSIC 2010}
 \label{sec:exp_e2}
@@ -763,7 +763,7 @@ We train Tiny/Small encoder models end-to-end on CSIC 2010 HTTP anomaly detectio
 We also evaluate drift robustness under realistic, semantics-preserving re-serialization: reordering record-aware key--value groups and normalizing whitespace.
 
 Under token-fair training, CIT achieves substantially shorter sequences than standard subword baselines, which increases effective sample throughput and stabilizes optimization under the same token budget.
-Compared to the lossless byte-level baseline, CIT targets similar robustness at a far lower interface cost by enforcing interface constraints rather than relying on lossless tokenization.
+Compared to the lossless byte-level baseline, CIT achieves substantially higher robustness at a far lower interface cost by enforcing interface constraints rather than relying on lossless tokenization.
 In final test accuracy, CIT is competitive or better under compute-matched budgets, with the largest gains appearing in drift robustness.
 
 Table~\ref{tab:e2_csic_token_fair} summarizes final accuracy, drift accuracy, and token-length statistics under token-fair training, and Figure~\ref{fig:e2_csic_token_fair_frontier_acc_vs_len} shows the resulting accuracy--length frontier.
@@ -775,19 +775,19 @@ Table~\ref{tab:e2_csic_token_fair} summarizes final accuracy, drift accuracy, an
 \toprule
 Model & Tokenizer & Acc. & Drift acc. & avg\_len & p95\_len \\
 \midrule
-small & BPE & 0.898 & 0.490 & 327.2 & 514 \\
+small & BPE & 0.906 & 0.503 & 327.2 & 514 \\
 small & Bytes & 0.686 & 0.442 & 785.3 & 1059 \\
-small & CIT & 0.913 & 0.913 & 217.0 & 416 \\
-small & Unigram & 0.860 & 0.860 & 406.4 & 595 \\
-small & WordPiece & 0.918 & 0.486 & 329.4 & 526 \\
+small & CIT & 0.915 & 0.915 & 217.0 & 416 \\
+small & Unigram & 0.864 & 0.868 & 406.4 & 595 \\
+small & WordPiece & 0.904 & 0.478 & 329.4 & 526 \\
 tiny & BPE & 0.853 & 0.469 & 327.2 & 514 \\
 tiny & Bytes & 0.686 & 0.457 & 785.3 & 1059 \\
-tiny & CIT & 0.909 & 0.909 & 217.0 & 416 \\
-tiny & Unigram & 0.795 & 0.792 & 406.4 & 595 \\
-tiny & WordPiece & 0.879 & 0.465 & 329.4 & 526 \\
+tiny & CIT & 0.907 & 0.907 & 217.0 & 416 \\
+tiny & Unigram & 0.798 & 0.795 & 406.4 & 595 \\
+tiny & WordPiece & 0.895 & 0.477 & 329.4 & 526 \\
 \bottomrule
 \end{tabular}
-\caption{E2 (CSIC 2010 HTTP) token-fair summary across seeds.}
+\caption{E2 (CSIC 2010 HTTP) token-fair summary (seed0).}
 \label{tab:e2_csic_token_fair}
 \end{table}
 
@@ -814,14 +814,14 @@ Model & Tokenizer & $t_{95}$ (M tokens) \\
 \midrule
 small & BPE & 4.77 \\
 small & Bytes & 3.83 \\
-small & CIT & 1.64 \\
+small & CIT & 1.85 \\
 small & Unigram & 6.29 \\
-small & WordPiece & 4.98 \\
+small & WordPiece & 5.18 \\
 tiny & BPE & 6.66 \\
 tiny & Bytes & 6.18 \\
 tiny & CIT & 2.44 \\
 tiny & Unigram & 7.12 \\
-tiny & WordPiece & 4.96 \\
+tiny & WordPiece & 6.19 \\
 \bottomrule
 \end{tabular}
 \caption{E2 (CSIC 2010 HTTP) token-fair convergence: tokens to reach 95\% of best validation accuracy (from learning curves).}
@@ -841,7 +841,7 @@ tiny & WordPiece & 4.96 \\
 E3 closes the loop at the system level by measuring whether CIT shifts the end-to-end accuracy/latency trade-off under fully trained models.
 On OpenML Adult, we train each (tokenizer, model family) pair end-to-end under a fixed token budget (5M encoder tokens) and measure average/P95 sequence lengths and P95 forward-pass latency.
 
-CIT reduces average and tail sequence lengths relative to standard subword baselines, yielding consistent latency reductions at matched or improved accuracy.
+CIT reduces average and tail sequence lengths relative to standard subword baselines, yielding consistent latency reductions at comparable accuracy.
 The byte-level baseline provides a complementary operating point with high fidelity but higher latency due to its rate.
 Overall, CIT improves operating points on the accuracy--latency and accuracy--parameter frontiers by simultaneously reducing interface cost and preserving task-relevant prefix information (lower surrogate distortion), enabling smaller models to match the accuracy of larger baselines in some regimes.
 
@@ -854,19 +854,19 @@ Results are summarized in Table~\ref{tab:e3_pareto} and Figure~\ref{fig:e3_paret
 \toprule
 Backbone & Tokenizer & Params (M) & Acc. & avg\_len & p95\_len & Distortion $\hat{\Delta}$ & p95 latency (ms) \\
 \midrule
-mini & BPE & 3.82 & 0.843 & 106.3 & 111 & 0.206 & 1.40 \\
-mini & Bytes & 3.82 & 0.826 & 336.5 & 347 & 0.287 & 9.38 \\
-mini & CIT & 3.82 & 0.849 & 60.5 & 69 & 0.138 & 1.29 \\
-mini & Unigram & 3.82 & 0.835 & 233.0 & 245 & 0.287 & 5.35 \\
-mini & WordPiece & 3.82 & 0.852 & 106.4 & 112 & 0.185 & 1.43 \\
-small & BPE & 11.63 & 0.810 & 106.3 & 111 & 0.206 & 6.09 \\
-small & Bytes & 11.63 & 0.814 & 336.5 & 347 & 0.287 & 11.93 \\
-small & CIT & 11.63 & 0.809 & 60.5 & 69 & 0.138 & 4.75 \\
-small & Unigram & 11.63 & 0.760 & 233.0 & 245 & 0.287 & 15.13 \\
-small & WordPiece & 11.63 & 0.761 & 106.4 & 112 & 0.185 & 6.05 \\
+mini & BPE & 3.82 & 0.843 & 106.3 & 111 & 0.206 & 1.39 \\
+mini & Bytes & 3.82 & 0.826 & 336.5 & 347 & 0.287 & 9.34 \\
+mini & CIT & 3.82 & 0.849 & 60.5 & 69 & 0.138 & 1.16 \\
+mini & Unigram & 3.82 & 0.836 & 233.0 & 245 & 0.287 & 5.36 \\
+mini & WordPiece & 3.82 & 0.851 & 106.4 & 112 & 0.186 & 1.45 \\
+small & BPE & 11.63 & 0.810 & 106.3 & 111 & 0.206 & 6.06 \\
+small & Bytes & 11.63 & 0.810 & 336.5 & 347 & 0.287 & 23.79 \\
+small & CIT & 11.63 & 0.809 & 60.5 & 69 & 0.138 & 2.64 \\
+small & Unigram & 11.63 & 0.787 & 233.0 & 245 & 0.287 & 15.14 \\
+small & WordPiece & 11.63 & 0.761 & 106.4 & 112 & 0.186 & 6.07 \\
 \bottomrule
 \end{tabular}
-\caption{E3 (Pareto slice) summary across seeds.}
+\caption{E3 (Pareto slice) summary (seed0).}
 \label{tab:e3_pareto}
 \end{table}
 

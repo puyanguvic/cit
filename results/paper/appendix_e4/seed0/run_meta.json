@@ -1,0 +1,39 @@
+{
+  "experiment": "e4_frontier",
+  "args": {
+    "vocabs": [
+      256,
+      512,
+      1024,
+      2048,
+      4096
+    ],
+    "max_len": 256,
+    "total_tokens": 2000000,
+    "full_finetune": false,
+    "device": "cuda",
+    "outdir": "paper/appendix_e4",
+    "seed": 0,
+    "plot": true,
+    "d_model": 128,
+    "n_layers": 4,
+    "n_heads": 4,
+    "dist_samples": 2000
+  },
+  "env": {
+    "timestamp_utc": "2026-01-29T07:32:01Z",
+    "python": "3.13.7 (main, Sep 18 2025, 19:47:49) [Clang 20.1.4 ]",
+    "platform": "Linux-6.8.0-87-generic-x86_64-with-glibc2.39",
+    "cwd": "/home/cnlab-pu/Projects/cit",
+    "torch_version": "2.10.0+cu128",
+    "cuda_built": true,
+    "cuda_available": true,
+    "cuda_device_count": 1,
+    "cuda_device_0": "NVIDIA GeForce RTX 4090",
+    "git": {
+      "root": "/home/cnlab-pu/Projects/cit",
+      "sha": "532575bad1c899bd21d5e48ecc380675f2f96e44",
+      "dirty": true
+    }
+  }
+}

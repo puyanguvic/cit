@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import OrderedDict
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
 
@@ -24,6 +25,34 @@ def build_trie(vocab: Dict[str, int]) -> TrieNode:
     return root
 
 
+_TRIE_CACHE_MAX = 32
+_TRIE_CACHE: "OrderedDict[int, tuple[Dict[str, int], int, TrieNode]]" = OrderedDict()
+
+
+def _get_trie_cached(vocab: Dict[str, int]) -> TrieNode:
+    """Return a compiled trie for a vocab, caching by object identity.
+
+    This is a performance optimization: many call sites tokenize thousands of
+    strings with the same vocab, and rebuilding the trie per string dominates
+    runtime. We treat the vocab as versioned by its length; if the dict grows,
+    we recompile.
+    """
+    key = id(vocab)
+    cached = _TRIE_CACHE.get(key)
+    if cached is not None:
+        v_ref, v_len, trie = cached
+        if v_ref is vocab and v_len == len(vocab):
+            _TRIE_CACHE.move_to_end(key)
+            return trie
+
+    trie = build_trie(vocab)
+    _TRIE_CACHE[key] = (vocab, len(vocab), trie)
+    _TRIE_CACHE.move_to_end(key)
+    while len(_TRIE_CACHE) > _TRIE_CACHE_MAX:
+        _TRIE_CACHE.popitem(last=False)
+    return trie
+
+
 def tokenize_longest_match(text: str, vocab: Dict[str, int], unk_id: int = 1) -> List[int]:
     """Greedy left-to-right longest-match tokenization.
 
@@ -35,7 +64,7 @@ def tokenize_longest_match(text: str, vocab: Dict[str, int], unk_id: int = 1) ->
     - We treat whitespace as hard token boundaries.
     - Contract markers like '<REC>' or '<ID_LONG>' should be included in vocab.
     """
-    trie = build_trie(vocab)
+    trie = _get_trie_cached(vocab)
 
     ids: List[int] = []
     for chunk in text.split():

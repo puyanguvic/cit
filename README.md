@@ -37,7 +37,8 @@ python scripts/appendix_e1.py --auto-download
 Customize the tokenizer list (name=repo_id pairs):
 
 ```bash
-python scripts/run_e0_tokenizer_playground.py --dataset csic2010 --data-dir data/csic2010 \\\n+  --tokenizers bert-base-cased,gpt2,gpt3=Xenova/text-davinci-003,gpt4=Xenova/gpt-4,grok1=Xenova/grok-1-tokenizer
+python scripts/run_e0_tokenizer_playground.py --dataset csic2010 --data-dir data/csic2010 \
+  --tokenizers bert-base-cased,gpt2,gpt3=Xenova/text-davinci-003,gpt4=Xenova/gpt-4,grok1=Xenova/grok-1-tokenizer
 ```
 
 ### E1 (synthetic structured stream + format drift variants) — main paper
@@ -71,6 +72,8 @@ python scripts/appendix_e3.py --device cuda --seed 0
 ```bash
 python scripts/appendix_e4.py --vocabs 256,512,1024,2048,4096 --device cuda --seed 0 --plot
 ```
+
+Note: by default this sweep runs in *probe-only* mode (fast) which can yield flat, majority-class accuracy curves on a random encoder backbone. For meaningful end-to-end accuracy frontiers, add `--full-finetune` (slower).
 
 This produces `results/paper/appendix_e4/seed0/results.csv` and `frontier.csv`, plus tokenizer artifacts under `results/paper/appendix_e4/seed0/tokenizers/vocabXXXX/`.
 
@@ -127,6 +130,8 @@ This will populate:
 - `results/paper/e3/seed0/...`
 and export paper-ready artifacts under:
 - `results/paper/paper_artifacts/` (see `results/paper/paper_artifacts/MANIFEST.md`)
+and (by default) sync the figures referenced by `paper.tex`/`appendix.tex` into:
+- `Figs/`
 
 To also run appendix sweeps:
 
@@ -157,4 +162,10 @@ To skip paper artifact export (and keep runs minimal):
 
 ```bash
 python scripts/run_all.py --device cuda --seed 0 --no-paper
+```
+
+To disable syncing into `Figs/` (while still exporting artifacts):
+
+```bash
+python scripts/run_all.py --device cuda --seed 0 --no-sync-figs
 ```

@@ -53,6 +53,18 @@ def main():
         help="Disable paper artifact export.",
     )
     ap.add_argument(
+        "--sync-figs",
+        dest="sync_figs",
+        action="store_true",
+        help="Sync figures referenced by the LaTeX sources into ./Figs after export (default).",
+    )
+    ap.add_argument(
+        "--no-sync-figs",
+        dest="sync_figs",
+        action="store_false",
+        help="Disable syncing figures into ./Figs.",
+    )
+    ap.add_argument(
         "--e2-data-dir",
         "--e5-data-dir",
         dest="e2_data_dir",
@@ -82,7 +94,7 @@ def main():
             "Default: run main-paper e1,e2,e3."
         ),
     )
-    ap.set_defaults(auto_download=True, paper=True)
+    ap.set_defaults(auto_download=True, paper=True, sync_figs=True)
     args = ap.parse_args()
 
     raw_only = [x.strip().lower() for x in args.only.split(",") if x.strip()]
@@ -125,6 +137,10 @@ def main():
         if not only:
             return k in {"e1", "e2", "e3"}
         return k in only
+
+    want_any_appendix = any(
+        enabled(k) for k in {"appendix_e1", "appendix_e2", "appendix_e3", "appendix_e4"}
+    )
 
     if args.seeds:
         seeds = [int(x.strip()) for x in args.seeds.split(",") if x.strip()]
@@ -198,6 +214,11 @@ def main():
 
     if args.paper:
         run("export_paper_artifacts.py", ["--run-root", args.outroot])
+        if args.sync_figs:
+            sync_args = ["--run-root", args.outroot, "--tex", "paper.tex"]
+            if want_any_appendix:
+                sync_args += ["--tex", "appendix.tex"]
+            run("sync_figs.py", sync_args)
     print("\n[OK] All requested experiments finished.")
     if len(seeds) == 1:
         print(f"Results root: results/{args.outroot}/<experiment>/seed{seeds[0]}")

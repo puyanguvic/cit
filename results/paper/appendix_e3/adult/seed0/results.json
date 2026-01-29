@@ -1,0 +1,60 @@
+{
+  "rows": [
+    {
+      "dataset": "adult",
+      "tokenizer": "BPE",
+      "acc": 0.8388780837342614,
+      "majority_acc": 0.7607299157986334,
+      "avg_len": 106.31292865185792,
+      "p95_len": 111,
+      "distortion_hat": 0.20627027908430753,
+      "vocab": 2048,
+      "max_len": 256,
+      "total_tokens": 2000000,
+      "seed": 0,
+      "probe_only": false
+    },
+    {
+      "dataset": "adult",
+      "tokenizer": "WordPiece",
+      "acc": 0.8374449790152523,
+      "majority_acc": 0.7607299157986334,
+      "avg_len": 106.44098679496366,
+      "p95_len": 112,
+      "distortion_hat": 0.1817085370388857,
+      "vocab": 2048,
+      "max_len": 256,
+      "total_tokens": 2000000,
+      "seed": 0,
+      "probe_only": false
+    },
+    {
+      "dataset": "adult",
+      "tokenizer": "Unigram",
+      "acc": 0.8099088954857201,
+      "majority_acc": 0.7607299157986334,
+      "avg_len": 232.96079434947282,
+      "p95_len": 245,
+      "distortion_hat": 0.2867556595883906,
+      "vocab": 2048,
+      "max_len": 256,
+      "total_tokens": 2000000,
+      "seed": 0,
+      "probe_only": false
+    },
+    {
+      "dataset": "adult",
+      "tokenizer": "CIT",
+      "acc": 0.8416419285494933,
+      "majority_acc": 0.7607299157986334,
+      "avg_len": 60.534548060190396,
+      "p95_len": 69,
+      "distortion_hat": 0.13812096784252623,
+      "vocab": 2048,
+      "max_len": 256,
+      "total_tokens": 2000000,
+      "seed": 0,
+      "probe_only": false
+    }
+  ]
+}

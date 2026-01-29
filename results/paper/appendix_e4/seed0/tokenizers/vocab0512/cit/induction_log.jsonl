@@ -1,0 +1,11 @@
+{"step": -1, "vocab_size": 12, "base_rate": 221.8035, "base_dist": 0.17419258530255743}
+{"step": 50, "token": "ita", "vocab_size": 51, "rate": 188.607, "dist": 0.25247251682138155, "score": 120000.0, "mode": "fast"}
+{"step": 100, "token": "cat", "vocab_size": 101, "rate": 174.888, "dist": 0.24315849178237722, "score": 80000.0, "mode": "fast"}
+{"step": 150, "token": "ra", "vocab_size": 151, "rate": 156.808, "dist": 0.2903299978097315, "score": 31504.0, "mode": "fast"}
+{"step": 200, "token": "nt", "vocab_size": 201, "rate": 135.774, "dist": 0.35808992870862655, "score": 20274.0, "mode": "fast"}
+{"step": 250, "token": "nlwgt", "vocab_size": 251, "rate": 120.139, "dist": 0.16514926920931142, "score": 80000.0, "mode": "fast"}
+{"step": 300, "token": "marita", "vocab_size": 301, "rate": 118.08, "dist": 0.129830191153362, "score": 100000.0, "mode": "fast"}
+{"step": 350, "token": "l-s", "vocab_size": 351, "rate": 113.577, "dist": 0.10392239906807714, "score": 40000.0, "mode": "fast"}
+{"step": 400, "token": "pation", "vocab_size": 401, "rate": 111.074, "dist": 0.15836459300000091, "score": 100000.0, "mode": "fast"}
+{"step": 450, "token": "itallos", "vocab_size": 451, "rate": 104.605, "dist": 0.10295202353996409, "score": 120000.0, "mode": "fast"}
+{"step": 500, "token": "ve-c", "vocab_size": 501, "rate": 99.714, "dist": 0.09789625644736293, "score": 60000.0, "mode": "fast"}

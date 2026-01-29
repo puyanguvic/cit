@@ -1,169 +1,169 @@
 {
   "rows": [
     {
-      "vocab_size": 256,
-      "tokenizer": "BPE",
       "acc": 0.7606715119254785,
       "avg_len": 116.44610502610298,
-      "p95_len": 128,
       "distortion_hat": 0.1870780338418229,
-      "tokenize_ms_per_sample": 0.042837198513249554,
       "encode_total_s": 1.995099893771112,
-      "train_time_s": 2.2661967892199755
+      "p95_len": 128,
+      "tokenize_ms_per_sample": 0.043647565258045994,
+      "tokenizer": "BPE",
+      "train_time_s": 2.2661967892199755,
+      "vocab_size": 256
     },
     {
-      "vocab_size": 256,
-      "tokenizer": "WordPiece",
       "acc": 0.7606715119254785,
       "avg_len": 124.49759443136452,
-      "p95_len": 136,
       "distortion_hat": 0.2005724874922834,
-      "tokenize_ms_per_sample": 0.04423971349994341,
       "encode_total_s": 2.07824544981122,
-      "train_time_s": 0.633878918364644
+      "p95_len": 136,
+      "tokenize_ms_per_sample": 0.04455814945201079,
+      "tokenizer": "WordPiece",
+      "train_time_s": 0.633878918364644,
+      "vocab_size": 256
     },
     {
-      "vocab_size": 256,
-      "tokenizer": "CIT",
       "acc": 0.7606715119254785,
       "avg_len": 120.63240863957417,
-      "p95_len": 132,
       "distortion_hat": 0.2580530385046235,
-      "tokenize_ms_per_sample": 0.09024887469907601,
       "encode_total_s": 4.466893399134278,
-      "train_time_s": 0.6366806337609887
+      "p95_len": 132,
+      "tokenize_ms_per_sample": 0.027076111175119877,
+      "tokenizer": "CIT",
+      "train_time_s": 0.6366806337609887,
+      "vocab_size": 256
     },
     {
-      "vocab_size": 512,
-      "tokenizer": "BPE",
       "acc": 0.7606715119254785,
       "avg_len": 107.5728324291125,
-      "p95_len": 113,
       "distortion_hat": 0.1860202718529875,
-      "tokenize_ms_per_sample": 0.04074075073003769,
       "encode_total_s": 2.0126664508134127,
-      "train_time_s": 0.6013198001310229
+      "p95_len": 113,
+      "tokenize_ms_per_sample": 0.043150736639897026,
+      "tokenizer": "BPE",
+      "train_time_s": 0.6013198001310229,
+      "vocab_size": 512
     },
     {
-      "vocab_size": 512,
-      "tokenizer": "WordPiece",
       "acc": 0.7606715119254785,
       "avg_len": 108.11178216808271,
-      "p95_len": 114,
       "distortion_hat": 0.17664813324879716,
-      "tokenize_ms_per_sample": 0.03942054634292921,
       "encode_total_s": 1.917788322083652,
-      "train_time_s": 0.5913003496825695
+      "p95_len": 114,
+      "tokenize_ms_per_sample": 0.04248515609651804,
+      "tokenizer": "WordPiece",
+      "train_time_s": 0.5913003496825695,
+      "vocab_size": 512
     },
     {
-      "vocab_size": 512,
-      "tokenizer": "CIT",
       "acc": 0.7606715119254785,
       "avg_len": 99.63240863957417,
-      "p95_len": 111,
       "distortion_hat": 0.2061942581975242,
-      "tokenize_ms_per_sample": 0.20178481657058,
       "encode_total_s": 10.070323750376701,
-      "train_time_s": 0.6353039471432567
+      "p95_len": 111,
+      "tokenize_ms_per_sample": 0.026637736707925797,
+      "tokenizer": "CIT",
+      "train_time_s": 0.6353039471432567,
+      "vocab_size": 512
     },
     {
-      "vocab_size": 1024,
-      "tokenizer": "BPE",
       "acc": 0.7606715119254785,
       "avg_len": 106.76353772136349,
-      "p95_len": 112,
       "distortion_hat": 0.20335685028014372,
-      "tokenize_ms_per_sample": 0.04030697171886762,
       "encode_total_s": 2.0841791555285454,
-      "train_time_s": 0.5910916915163398
+      "p95_len": 112,
+      "tokenize_ms_per_sample": 0.04309562500566244,
+      "tokenizer": "BPE",
+      "train_time_s": 0.5910916915163398,
+      "vocab_size": 1024
     },
     {
-      "vocab_size": 1024,
-      "tokenizer": "WordPiece",
       "acc": 0.7606715119254785,
       "avg_len": 106.96755041457672,
-      "p95_len": 112,
       "distortion_hat": 0.19652555734131974,
-      "tokenize_ms_per_sample": 0.03947886421034733,
       "encode_total_s": 1.8674631137400866,
-      "train_time_s": 0.6086625028401613
+      "p95_len": 112,
+      "tokenize_ms_per_sample": 0.04231437171498934,
+      "tokenizer": "WordPiece",
+      "train_time_s": 0.6086625028401613,
+      "vocab_size": 1024
     },
     {
-      "vocab_size": 1024,
-      "tokenizer": "CIT",
       "acc": 0.7606715119254785,
       "avg_len": 72.22509980550721,
-      "p95_len": 82,
       "distortion_hat": 0.14355906280195735,
-      "tokenize_ms_per_sample": 0.5612121165419618,
       "encode_total_s": 27.91871696151793,
-      "train_time_s": 0.7945578740909696
+      "p95_len": 82,
+      "tokenize_ms_per_sample": 0.025293263296286266,
+      "tokenizer": "CIT",
+      "train_time_s": 0.7945578740909696,
+      "vocab_size": 1024
     },
     {
-      "vocab_size": 2048,
-      "tokenizer": "BPE",
       "acc": 0.7606715119254785,
       "avg_len": 106.31292865185792,
-      "p95_len": 111,
       "distortion_hat": 0.20627027908430753,
-      "tokenize_ms_per_sample": 0.040897744397322335,
       "encode_total_s": 2.0070169903337955,
-      "train_time_s": 0.5934987626969814
+      "p95_len": 111,
+      "tokenize_ms_per_sample": 0.042573402635753155,
+      "tokenizer": "BPE",
+      "train_time_s": 0.5934987626969814,
+      "vocab_size": 2048
     },
     {
-      "vocab_size": 2048,
-      "tokenizer": "WordPiece",
       "acc": 0.7606715119254785,
       "avg_len": 106.44098679496366,
-      "p95_len": 112,
       "distortion_hat": 0.1804245443585788,
-      "tokenize_ms_per_sample": 0.040009415708482265,
       "encode_total_s": 1.878328550606966,
-      "train_time_s": 0.6001562532037497
+      "p95_len": 112,
+      "tokenize_ms_per_sample": 0.04106792466094097,
+      "tokenizer": "WordPiece",
+      "train_time_s": 0.6001562532037497,
+      "vocab_size": 2048
     },
     {
-      "vocab_size": 2048,
-      "tokenizer": "CIT",
       "acc": 0.7606715119254785,
       "avg_len": 60.534548060190396,
-      "p95_len": 69,
       "distortion_hat": 0.13812096784252623,
-      "tokenize_ms_per_sample": 1.1907217629874747,
       "encode_total_s": 59.56459967419505,
-      "train_time_s": 0.9029800556600094
+      "p95_len": 69,
+      "tokenize_ms_per_sample": 0.024886575527489185,
+      "tokenizer": "CIT",
+      "train_time_s": 0.9029800556600094,
+      "vocab_size": 2048
     },
     {
-      "vocab_size": 4096,
-      "tokenizer": "BPE",
       "acc": 0.7606715119254785,
       "avg_len": 106.05220595762104,
-      "p95_len": 111,
       "distortion_hat": 0.20666871585648974,
-      "tokenize_ms_per_sample": 0.040266926710804306,
       "encode_total_s": 2.1195235839113593,
-      "train_time_s": 0.5893154097720981
+      "p95_len": 111,
+      "tokenize_ms_per_sample": 0.04343642108142376,
+      "tokenizer": "BPE",
+      "train_time_s": 0.5893154097720981,
+      "vocab_size": 4096
     },
     {
-      "vocab_size": 4096,
-      "tokenizer": "WordPiece",
       "acc": 0.7606715119254785,
       "avg_len": 106.09745112089261,
-      "p95_len": 111,
       "distortion_hat": 0.19144637627565364,
-      "tokenize_ms_per_sample": 0.04073783724258343,
       "encode_total_s": 1.88857735786587,
-      "train_time_s": 0.5943572903051972
+      "p95_len": 111,
+      "tokenize_ms_per_sample": 0.04257689447452625,
+      "tokenizer": "WordPiece",
+      "train_time_s": 0.5943572903051972,
+      "vocab_size": 4096
     },
     {
-      "vocab_size": 4096,
-      "tokenizer": "CIT",
       "acc": 0.7606715119254785,
       "avg_len": 57.95291227351827,
-      "p95_len": 60,
       "distortion_hat": 0.12288894244111097,
-      "tokenize_ms_per_sample": 2.586331363146504,
       "encode_total_s": 131.79088909644634,
-      "train_time_s": 0.938108111731708
+      "p95_len": 60,
+      "tokenize_ms_per_sample": 0.0329344691708684,
+      "tokenizer": "CIT",
+      "train_time_s": 0.938108111731708,
+      "vocab_size": 4096
     }
   ]
 }

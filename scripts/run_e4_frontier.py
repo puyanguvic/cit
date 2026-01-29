@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import sys
 import time
 from pathlib import Path
 
@@ -96,6 +97,13 @@ def main():
     # distortion surrogate settings
     ap.add_argument("--dist-samples", type=int, default=2000)
     args = ap.parse_args()
+
+    if not args.full_finetune and sys.stderr.isatty():
+        print(
+            "[WARN] --full-finetune not set: probe-only training on a random encoder tends to produce "
+            "majority-class accuracy (flat acc frontiers). Use --full-finetune for meaningful accuracy curves.",
+            file=sys.stderr,
+        )
 
     vocabs = _parse_int_list(args.vocabs)
     set_seed(args.seed)
@@ -233,7 +241,7 @@ def main():
 
     # Optional: auto-plot for paper figures
     if args.plot:
-        import subprocess, sys
+        import subprocess
 
         script = Path(__file__).parent / "plot_frontier.py"
         subprocess.check_call([sys.executable, str(script), "--run_dir", str(outdir)])

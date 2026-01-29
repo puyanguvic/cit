@@ -1,0 +1,31 @@
+{
+  "experiment": "e2_uci",
+  "args": {
+    "dataset": "adult",
+    "vocab": 2048,
+    "max_len": 256,
+    "total_tokens": 2000000,
+    "probe_only": false,
+    "full_finetune": false,
+    "device": "cuda",
+    "seed": 0,
+    "outdir": "paper/appendix_e3/adult",
+    "out": ""
+  },
+  "env": {
+    "timestamp_utc": "2026-01-29T07:17:53Z",
+    "python": "3.13.7 (main, Sep 18 2025, 19:47:49) [Clang 20.1.4 ]",
+    "platform": "Linux-6.8.0-87-generic-x86_64-with-glibc2.39",
+    "cwd": "/home/cnlab-pu/Projects/cit",
+    "torch_version": "2.10.0+cu128",
+    "cuda_built": true,
+    "cuda_available": true,
+    "cuda_device_count": 1,
+    "cuda_device_0": "NVIDIA GeForce RTX 4090",
+    "git": {
+      "root": "/home/cnlab-pu/Projects/cit",
+      "sha": "532575bad1c899bd21d5e48ecc380675f2f96e44",
+      "dirty": true
+    }
+  }
+}

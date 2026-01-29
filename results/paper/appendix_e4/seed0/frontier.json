@@ -1,0 +1,15 @@
+{
+  "frontier": [
+    {
+      "vocab_size": 4096,
+      "tokenizer": "CIT",
+      "acc": 0.7606715119254785,
+      "avg_len": 57.95291227351827,
+      "p95_len": 60,
+      "distortion_hat": 0.12288894244111097,
+      "tokenize_ms_per_sample": 0.026776535746951897,
+      "encode_total_s": 1.4058132590726018,
+      "train_time_s": 5.172613481990993
+    }
+  ]
+}

@@ -126,7 +126,16 @@ def main():
     save_json(cit_contract, tok_dir / "cit" / "contract.json")
 
     # interface metrics (rate + surrogate distortion + oracle prefix predictability)
-    dcfg = DistortionCfg(sample_size=2000, seed=args.seed, show_progress=True)
+    #
+    # Note: the synthetic signal is placed mid-record. To make the interface probes
+    # meaningful, ensure the raw-prefix lengths actually reach the signal field;
+    # otherwise the teacher sees no label information and the probes become noise.
+    dcfg = DistortionCfg(
+        sample_size=2000,
+        seed=args.seed,
+        show_progress=True,
+        char_prefix_ts=(1024, 2048),
+    )
 
     runs = []
     audit_dir = outdir / "audit"
