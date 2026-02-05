@@ -1,0 +1,11 @@
+dataset,model,tokenizer,budget_mode,n,acc_mean,acc_std,drift_acc_mean,drift_acc_std,avg_len_mean,avg_len_std,p95_len_mean,p95_len_std,total_steps_mean,total_steps_std,total_tokens_mean,total_tokens_std
+csic2010,small,BPE,step_fair,1,0.9074,0.0,0.5048,0.0,327.2294,0.0,514.0,0.0,959.0,0.0,10000000.0,0.0
+csic2010,small,Bytes,step_fair,1,0.6888,0.0,0.4424,0.0,785.3036,0.0,1059.0,0.0,959.0,0.0,10000000.0,0.0
+csic2010,small,CIT,step_fair,1,0.9056,0.0,0.9056,0.0,216.9894,0.0,416.0,0.0,959.0,0.0,10000000.0,0.0
+csic2010,small,Unigram,step_fair,1,0.8718,0.0,0.8712,0.0,406.3974,0.0,595.0,0.0,959.0,0.0,10000000.0,0.0
+csic2010,small,WordPiece,step_fair,1,0.9154,0.0,0.4752,0.0,329.449,0.0,526.0,0.0,959.0,0.0,10000000.0,0.0
+csic2010,tiny,BPE,step_fair,1,0.849,0.0,0.4662,0.0,327.2294,0.0,514.0,0.0,959.0,0.0,10000000.0,0.0
+csic2010,tiny,Bytes,step_fair,1,0.6862,0.0,0.4426,0.0,785.3036,0.0,1059.0,0.0,959.0,0.0,10000000.0,0.0
+csic2010,tiny,CIT,step_fair,1,0.8872,0.0,0.8872,0.0,216.9894,0.0,416.0,0.0,959.0,0.0,10000000.0,0.0
+csic2010,tiny,Unigram,step_fair,1,0.818,0.0,0.8154,0.0,406.3974,0.0,595.0,0.0,959.0,0.0,10000000.0,0.0
+csic2010,tiny,WordPiece,step_fair,1,0.896,0.0,0.4972,0.0,329.449,0.0,526.0,0.0,959.0,0.0,10000000.0,0.0

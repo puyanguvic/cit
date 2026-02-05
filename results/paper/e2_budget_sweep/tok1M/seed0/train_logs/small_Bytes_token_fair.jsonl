@@ -1,0 +1,15 @@
+{"seen_tokens": 65536, "seen_steps": 4, "train_loss": 0.6872230768203735, "train_acc": 0.5, "wall_s": 0.13769960403442383, "lr": 0.0003, "val_acc": 0.4554}
+{"seen_tokens": 131072, "seen_steps": 8, "train_loss": 0.700337827205658, "train_acc": 0.4375, "wall_s": 2.9256296157836914, "lr": 0.0003, "val_acc": 0.4554}
+{"seen_tokens": 196608, "seen_steps": 12, "train_loss": 0.6360285878181458, "train_acc": 0.625, "wall_s": 5.911593198776245, "lr": 0.0003, "val_acc": 0.4554}
+{"seen_tokens": 262144, "seen_steps": 16, "train_loss": 0.7206332087516785, "train_acc": 0.59375, "wall_s": 8.108586549758911, "lr": 0.0003, "val_acc": 0.5446}
+{"seen_tokens": 327670, "seen_steps": 20, "train_loss": 0.7074458003044128, "train_acc": 0.5625, "wall_s": 10.30163311958313, "lr": 0.0003, "val_acc": 0.5446}
+{"seen_tokens": 393206, "seen_steps": 24, "train_loss": 0.6824660897254944, "train_acc": 0.53125, "wall_s": 13.419096946716309, "lr": 0.0003, "val_acc": 0.4554}
+{"seen_tokens": 458733, "seen_steps": 28, "train_loss": 0.6917135715484619, "train_acc": 0.5, "wall_s": 16.546890020370483, "lr": 0.0003, "val_acc": 0.4554}
+{"seen_tokens": 524269, "seen_steps": 32, "train_loss": 0.6848212480545044, "train_acc": 0.5, "wall_s": 19.639769315719604, "lr": 0.0003, "val_acc": 0.5446}
+{"seen_tokens": 589805, "seen_steps": 36, "train_loss": 0.9049352407455444, "train_acc": 0.4375, "wall_s": 22.73209047317505, "lr": 0.0003, "val_acc": 0.5446}
+{"seen_tokens": 655341, "seen_steps": 40, "train_loss": 0.7487267851829529, "train_acc": 0.4375, "wall_s": 25.853842735290527, "lr": 0.0003, "val_acc": 0.4554}
+{"seen_tokens": 720877, "seen_steps": 44, "train_loss": 0.711810290813446, "train_acc": 0.34375, "wall_s": 28.982881784439087, "lr": 0.0003, "val_acc": 0.5446}
+{"seen_tokens": 786413, "seen_steps": 48, "train_loss": 0.8308521509170532, "train_acc": 0.40625, "wall_s": 32.08702373504639, "lr": 0.0003, "val_acc": 0.5446}
+{"seen_tokens": 851929, "seen_steps": 52, "train_loss": 0.6785563826560974, "train_acc": 0.625, "wall_s": 35.91831612586975, "lr": 0.0003, "val_acc": 0.5446}
+{"seen_tokens": 917403, "seen_steps": 56, "train_loss": 0.6728252172470093, "train_acc": 0.59375, "wall_s": 39.780184268951416, "lr": 0.0003, "val_acc": 0.4554}
+{"seen_tokens": 982939, "seen_steps": 60, "train_loss": 0.6688559055328369, "train_acc": 0.5625, "wall_s": 42.17067217826843, "lr": 0.0003, "val_acc": 0.4554}

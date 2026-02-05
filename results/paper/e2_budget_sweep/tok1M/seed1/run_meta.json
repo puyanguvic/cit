@@ -1,0 +1,41 @@
+{
+  "experiment": "e2_csic_http",
+  "args": {
+    "data_dir": "data/csic2010",
+    "vocab": 2048,
+    "max_len": 512,
+    "models": "tiny,small",
+    "total_tokens": 1000000,
+    "budget_modes": "token",
+    "step_fair_steps": 0,
+    "batch_size": 32,
+    "lr": 0.0003,
+    "grad_clip": 1.0,
+    "device": "cuda",
+    "seed": 1,
+    "outdir": "paper/e2_budget_sweep/tok1M",
+    "plot": false,
+    "plot_group_key": "tokenizer",
+    "include_raw": false,
+    "n_train": 20000,
+    "n_val": 5000,
+    "n_test": 5000,
+    "auto_download": true
+  },
+  "env": {
+    "timestamp_utc": "2026-01-29T20:34:19Z",
+    "python": "3.13.7 (main, Sep 18 2025, 19:47:49) [Clang 20.1.4 ]",
+    "platform": "Linux-6.8.0-87-generic-x86_64-with-glibc2.39",
+    "cwd": "/home/cnlab-pu/Projects/cit",
+    "torch_version": "2.10.0+cu128",
+    "cuda_built": true,
+    "cuda_available": true,
+    "cuda_device_count": 1,
+    "cuda_device_0": "NVIDIA GeForce RTX 4090",
+    "git": {
+      "root": "/home/cnlab-pu/Projects/cit",
+      "sha": "ce8bbaa2d0f230d316efdffe32bcd2ba7881dd98",
+      "dirty": true
+    }
+  }
+}

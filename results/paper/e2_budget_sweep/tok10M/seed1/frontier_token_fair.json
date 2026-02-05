@@ -1,0 +1,23 @@
+{
+  "frontier": [
+    {
+      "dataset": "csic2010",
+      "model": "small",
+      "tokenizer": "CIT",
+      "budget_mode": "token_fair",
+      "acc": 0.9192,
+      "drift_acc": 0.9192,
+      "avg_len": 213.3634,
+      "p95_len": 402,
+      "n_params": 3815426,
+      "params_m": 3.815426,
+      "vocab": 2048,
+      "max_len": 512,
+      "total_tokens": 10000000,
+      "total_steps": 0,
+      "majority_train_frac": 0.5423,
+      "majority_test_acc": 0.5426,
+      "seed": 1
+    }
+  ]
+}

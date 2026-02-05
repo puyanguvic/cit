@@ -1,0 +1,11 @@
+dataset,model,tokenizer,budget_mode,n,acc_mean,acc_std,drift_acc_mean,drift_acc_std,avg_len_mean,avg_len_std,p95_len_mean,p95_len_std,total_steps_mean,total_steps_std,total_tokens_mean,total_tokens_std
+csic2010,small,BPE,token_fair,1,0.906,0.0,0.503,0.0,327.2294,0.0,514.0,0.0,0.0,0.0,10000000.0,0.0
+csic2010,small,Bytes,token_fair,1,0.686,0.0,0.4424,0.0,785.3036,0.0,1059.0,0.0,0.0,0.0,10000000.0,0.0
+csic2010,small,CIT,token_fair,1,0.9148,0.0,0.9148,0.0,216.9894,0.0,416.0,0.0,0.0,0.0,10000000.0,0.0
+csic2010,small,Unigram,token_fair,1,0.8636,0.0,0.8682,0.0,406.3974,0.0,595.0,0.0,0.0,0.0,10000000.0,0.0
+csic2010,small,WordPiece,token_fair,1,0.9042,0.0,0.4784,0.0,329.4438,0.0,526.0,0.0,0.0,0.0,10000000.0,0.0
+csic2010,tiny,BPE,token_fair,1,0.8528,0.0,0.4686,0.0,327.2294,0.0,514.0,0.0,0.0,0.0,10000000.0,0.0
+csic2010,tiny,Bytes,token_fair,1,0.686,0.0,0.4574,0.0,785.3036,0.0,1059.0,0.0,0.0,0.0,10000000.0,0.0
+csic2010,tiny,CIT,token_fair,1,0.9068,0.0,0.9068,0.0,216.9894,0.0,416.0,0.0,0.0,0.0,10000000.0,0.0
+csic2010,tiny,Unigram,token_fair,1,0.7982,0.0,0.7952,0.0,406.3974,0.0,595.0,0.0,0.0,0.0,10000000.0,0.0
+csic2010,tiny,WordPiece,token_fair,1,0.8946,0.0,0.4772,0.0,329.4438,0.0,526.0,0.0,0.0,0.0,10000000.0,0.0

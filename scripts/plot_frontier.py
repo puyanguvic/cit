@@ -130,7 +130,13 @@ def plot_frontier(
     # with filled/hollow markers and a connecting segment (robustness gap).
     has_drift = any("drift_acc" in r for r in rows)
     has_model = any("model" in r for r in rows)
-    show_drift_gap = bool(has_drift and has_model and x_key == "avg_len" and y_key == "acc" and group_key == "tokenizer")
+    show_drift_gap = bool(
+        has_drift
+        and has_model
+        and y_key == "acc"
+        and group_key == "tokenizer"
+        and x_key in {"avg_len", "total_tokens"}
+    )
 
     fig, ax = plt.subplots(figsize=(6.6, 3.2))
 
@@ -150,11 +156,40 @@ def plot_frontier(
             marker = MODEL_MARKERS.get(m, "o")
             model_handles.append(Line2D([0], [0], marker=marker, color="black", linestyle="None", label=m))
 
-        tok_handles: list[Line2D] = []
-        for tok in group_names:
-            tok_handles.append(
-                Line2D([0], [0], marker="o", color=_tokenizer_color(tok), linestyle="None", label=tok)
-            )
+        # Small horizontal offsets per-model to avoid overplotting when multiple
+        # models share the same avg_len (tokenization is model-independent).
+        xs_unique = sorted({to_float(r.get(x_key)) for r in rows})
+        xs_unique = [x for x in xs_unique if not (isinstance(x, float) and (math.isnan(x) or math.isinf(x)))]
+        xs_unique = sorted({float(x) for x in xs_unique})
+        min_sep = 1.0
+        if len(xs_unique) >= 2:
+            diffs = [b - a for a, b in zip(xs_unique, xs_unique[1:]) if b > a]
+            if diffs:
+                min_sep = float(min(diffs))
+        dx = 0.06 * min_sep
+        model_offsets: dict[str, float] = {}
+        if models:
+            center = 0.5 * (len(models) - 1)
+            for i, m in enumerate(models):
+                model_offsets[m] = (i - center) * dx
+
+        # If there is a big empty x-gap (e.g., Bytes is far right), use a broken
+        # x-axis to increase density for the main cluster.
+        use_broken_x = False
+        break_left_max: float | None = None
+        break_right_min: float | None = None
+        if x_key == "avg_len" and len(xs_unique) >= 4:
+            gaps = [(xs_unique[i + 1] - xs_unique[i], i) for i in range(len(xs_unique) - 1)]
+            gap, idx = max(gaps, key=lambda t: t[0])
+            span = xs_unique[-1] - xs_unique[0]
+            if span > 0 and (gap / span) >= 0.45:
+                use_broken_x = True
+                break_left_max = xs_unique[idx]
+                break_right_min = xs_unique[idx + 1]
+
+        tok_handles: list[Line2D] = [
+            Line2D([0], [0], marker="o", color=_tokenizer_color(tok), linestyle="None", label=tok) for tok in group_names
+        ]
 
         # Test vs drift semantics legend.
         sem_handles = [
@@ -162,31 +197,239 @@ def plot_frontier(
             Line2D([0], [0], marker="o", color="black", markerfacecolor="none", linestyle="None", label="drift"),
         ]
 
-        for tok in group_names:
-            color = _tokenizer_color(tok)
-            tok_rows = groups[tok]
-            for r in tok_rows:
-                x = to_float(r.get(x_key))
-                y_test = to_float(r.get("acc"))
-                y_drift = to_float(r.get("drift_acc"))
-                m = str(r.get("model", ""))
-                marker = MODEL_MARKERS.get(m, "o")
+        def _draw_on(ax) -> None:
+            # For token-budget sweeps, connect points across budgets so trends are
+            # visible (otherwise many points share the same x under avg_len).
+            if x_key == "total_tokens":
+                for tok in group_names:
+                    color = _tokenizer_color(tok)
+                    is_highlight = tok == "CIT"
+                    for m in models:
+                        pts_test: list[tuple[float, float]] = []
+                        pts_drift: list[tuple[float, float]] = []
+                        for r in groups[tok]:
+                            if str(r.get("model", "")) != m:
+                                continue
+                            x0 = to_float(r.get(x_key))
+                            y_test = to_float(r.get("acc"))
+                            y_drift = to_float(r.get("drift_acc"))
+                            if x0 is None or y_test is None or y_drift is None:
+                                continue
+                            x = x0 + model_offsets.get(m, 0.0)
+                            pts_test.append((x, y_test))
+                            pts_drift.append((x, y_drift))
+                        if len(pts_test) >= 2:
+                            pts_test.sort(key=lambda t: t[0])
+                            ax.plot(
+                                [p[0] for p in pts_test],
+                                [p[1] for p in pts_test],
+                                color=color,
+                                alpha=0.50 if is_highlight else 0.18,
+                                linewidth=2.2 if is_highlight else 1.1,
+                                zorder=1,
+                            )
+                        if len(pts_drift) >= 2:
+                            pts_drift.sort(key=lambda t: t[0])
+                            ax.plot(
+                                [p[0] for p in pts_drift],
+                                [p[1] for p in pts_drift],
+                                color=color,
+                                alpha=0.32 if is_highlight else 0.12,
+                                linewidth=1.8 if is_highlight else 0.9,
+                                linestyle="--",
+                                zorder=1,
+                            )
 
-                all_xs.extend([x])
-                all_ys.extend([y_test, y_drift])
+            for tok in group_names:
+                color = _tokenizer_color(tok)
+                tok_rows = groups[tok]
+                is_highlight = tok == "CIT"
+                for r in tok_rows:
+                    x0 = to_float(r.get(x_key))
+                    y_test = to_float(r.get("acc"))
+                    y_drift = to_float(r.get("drift_acc"))
+                    m = str(r.get("model", ""))
+                    marker = MODEL_MARKERS.get(m, "o")
+                    x = x0 + model_offsets.get(m, 0.0)
 
-                ax.plot([x, x], [y_drift, y_test], color=color, alpha=0.25, linewidth=1.8, solid_capstyle="round")
-                ax.scatter([x], [y_test], s=42, marker=marker, color=color, edgecolors="white", linewidths=0.6, zorder=3)
-                ax.scatter([x], [y_drift], s=42, marker=marker, facecolors="none", edgecolors=color, linewidths=1.3, zorder=3)
+                    all_xs.append(x0)
+                    all_ys.extend([y_test, y_drift])
 
-        fig.legend(
-            handles=tok_handles,
-            loc="upper center",
-            bbox_to_anchor=(0.5, 1.06),
-            ncol=min(5, len(tok_handles)),
-            frameon=False,
-        )
-        ax.legend(handles=sem_handles + model_handles, loc="lower left", frameon=False, ncol=1)
+                    gap_alpha = 0.55 if is_highlight else 0.18
+                    gap_lw = 2.6 if is_highlight else 1.6
+                    point_s = 58 if is_highlight else 42
+                    z = 4 if is_highlight else 3
+                    test_edge = "black" if is_highlight else "white"
+                    test_lw = 0.9 if is_highlight else 0.6
+                    drift_edge = "black" if is_highlight else color
+                    drift_lw = 1.5 if is_highlight else 1.3
+
+                    ax.plot([x, x], [y_drift, y_test], color=color, alpha=gap_alpha, linewidth=gap_lw, solid_capstyle="round")
+                    ax.scatter([x], [y_test], s=point_s, marker=marker, color=color, edgecolors=test_edge, linewidths=test_lw, zorder=z)
+                    ax.scatter([x], [y_drift], s=point_s, marker=marker, facecolors="none", edgecolors=drift_edge, linewidths=drift_lw, zorder=z)
+
+                    # Optional error bars (e.g., when plotting mean/std summaries).
+                    yerr_test = to_float(r.get("acc_std"))
+                    yerr_drift = to_float(r.get("drift_acc_std"))
+                    if yerr_test is not None and yerr_test > 0.0:
+                        ax.errorbar(
+                            [x],
+                            [y_test],
+                            yerr=[yerr_test],
+                            fmt="none",
+                            ecolor=color,
+                            elinewidth=0.9,
+                            capsize=2,
+                            alpha=0.55 if is_highlight else 0.35,
+                            zorder=z - 0.5,
+                        )
+                    if yerr_drift is not None and yerr_drift > 0.0:
+                        ax.errorbar(
+                            [x],
+                            [y_drift],
+                            yerr=[yerr_drift],
+                            fmt="none",
+                            ecolor=color,
+                            elinewidth=0.9,
+                            capsize=2,
+                            alpha=0.45 if is_highlight else 0.28,
+                            zorder=z - 0.5,
+                        )
+
+            if "CIT" in groups:
+                # Light annotation near the best CIT test point.
+                best_row = None
+                best_y = None
+                for r in groups["CIT"]:
+                    x = to_float(r.get(x_key))
+                    y = to_float(r.get("acc"))
+                    if x is None or y is None:
+                        continue
+                    if best_y is None or y > best_y:
+                        best_row = r
+                        best_y = y
+                if best_row is not None and best_y is not None:
+                    x0 = to_float(best_row.get(x_key))
+                    m = str(best_row.get("model", ""))
+                    x = x0 + model_offsets.get(m, 0.0)
+                    ax.annotate(
+                        "CIT",
+                        xy=(x, best_y),
+                        xytext=(6, 6),
+                        textcoords="offset points",
+                        fontsize=9,
+                        weight="bold",
+                        color=_tokenizer_color("CIT"),
+                    )
+
+        if use_broken_x and break_left_max is not None and break_right_min is not None:
+            # Switch to a broken-axis layout.
+            plt.close(fig)
+            fig, (ax_l, ax_r) = plt.subplots(
+                1,
+                2,
+                sharey=True,
+                figsize=(7.2, 3.2),
+                gridspec_kw={"width_ratios": [3.2, 1.1], "wspace": 0.05},
+            )
+            _apply_style()
+            _draw_on(ax_l)
+            _draw_on(ax_r)
+
+            left_min = xs_unique[0]
+            right_max = xs_unique[-1]
+            pad = 0.15 * min_sep
+            ax_l.set_xlim(left_min - pad, break_left_max + pad)
+            ax_r.set_xlim(break_right_min - 0.30 * min_sep, right_max + 0.18 * min_sep)
+
+            # Avoid scientific offset formatting on broken-axis panels.
+            try:
+                import matplotlib.ticker as mticker
+
+                fmt = mticker.ScalarFormatter(useOffset=False)
+                fmt.set_scientific(False)
+                for ax_ in (ax_l, ax_r):
+                    ax_.xaxis.set_major_formatter(fmt)
+                    ax_.xaxis.get_offset_text().set_visible(False)
+            except Exception:
+                pass
+
+            ax_l.spines.right.set_visible(False)
+            ax_r.spines.left.set_visible(False)
+            ax_r.tick_params(labelleft=False)
+            ax_r.yaxis.set_ticks_position("right")
+
+            d = 0.012
+            kwargs = dict(color="black", clip_on=False, linewidth=0.8)
+            ax_l.plot((1 - d, 1 + d), (-d, +d), transform=ax_l.transAxes, **kwargs)
+            ax_l.plot((1 - d, 1 + d), (1 - d, 1 + d), transform=ax_l.transAxes, **kwargs)
+            ax_r.plot((-d, +d), (-d, +d), transform=ax_r.transAxes, **kwargs)
+            ax_r.plot((-d, +d), (1 - d, 1 + d), transform=ax_r.transAxes, **kwargs)
+
+            fig.legend(
+                handles=tok_handles,
+                loc="upper center",
+                bbox_to_anchor=(0.5, 1.08),
+                ncol=min(5, len(tok_handles)),
+                frameon=False,
+            )
+            ax_l.legend(handles=sem_handles + model_handles, loc="lower left", frameon=False, ncol=1)
+
+            ax_l.set_ylabel(ylabel)
+            fig.supxlabel(xlabel)
+            _set_limits(ax_l, [], all_ys)
+            fig.tight_layout(rect=(0.0, 0.0, 1.0, 0.90))
+        else:
+            _draw_on(ax)
+            fig.legend(
+                handles=tok_handles,
+                loc="upper center",
+                bbox_to_anchor=(0.5, 1.06),
+                ncol=min(5, len(tok_handles)),
+                frameon=False,
+            )
+            ax.legend(handles=sem_handles + model_handles, loc="lower left", frameon=False, ncol=1)
+            ax.set_xlabel(xlabel)
+            ax.set_ylabel(ylabel)
+            _set_limits(ax, all_xs, all_ys)
+            if x_key == "total_tokens":
+                try:
+                    import matplotlib.ticker as mticker
+
+                    ax.set_xscale("log")
+                    xs_pos = [x for x in all_xs if isinstance(x, float) and x > 0 and not math.isnan(x) and not math.isinf(x)]
+                    if xs_pos:
+                        ax.set_xlim(min(xs_pos) / 1.15, max(xs_pos) * 1.15)
+
+                    ax.xaxis.set_major_locator(mticker.LogLocator(base=10, subs=(1.0, 2.0, 5.0)))
+
+                    def _fmt_tokens(x, _pos=None) -> str:
+                        try:
+                            x = float(x)
+                        except Exception:
+                            return ""
+                        if x >= 1_000_000:
+                            v = x / 1_000_000.0
+                            if abs(v - round(v)) < 1e-6:
+                                return f"{int(round(v))}M"
+                            return f"{v:.1f}M"
+                        if x >= 1_000:
+                            v = x / 1_000.0
+                            if abs(v - round(v)) < 1e-6:
+                                return f"{int(round(v))}k"
+                            return f"{v:.1f}k"
+                        return str(int(round(x)))
+
+                    ax.xaxis.set_major_formatter(mticker.FuncFormatter(_fmt_tokens))
+                    ax.xaxis.get_offset_text().set_visible(False)
+                except Exception:
+                    pass
+            fig.tight_layout(rect=(0.0, 0.0, 1.0, 0.90))
+
+        fig.savefig(outpath.with_suffix(".pdf"), bbox_inches="tight")
+        fig.savefig(outpath.with_suffix(".png"), dpi=300, bbox_inches="tight")
+        plt.close(fig)
+        return
     else:
         # Generic: line+markers per group.
         style_key = None
@@ -195,7 +438,7 @@ def plot_frontier(
         elif any("model" in r for r in rows):
             style_key = "model"
 
-        show_vocab_lines = bool(style_key == "vocab_size" and not (x_key == "avg_len" and y_key == "tokenize_ms_per_sample"))
+        show_vocab_lines = bool(style_key == "vocab_size")
 
         vocab_sizes: list[int] = []
         if style_key == "vocab_size":
@@ -208,6 +451,7 @@ def plot_frontier(
 
         for name in group_names:
             color = _tokenizer_color(name)
+            is_highlight = name == "CIT"
             rs = groups[name]
 
             # Sort by x for a sensible visual trend.
@@ -232,12 +476,41 @@ def plot_frontier(
             xs = [p[0] for p in pairs]
             ys = [p[1] for p in pairs]
 
-            # If we have many points (e.g., vocab sweep), draw a line; otherwise just scatter.
-            draw_line = len(pairs) >= 3 and style_key == "vocab_size"
-            if style_key == "vocab_size" and x_key == "avg_len" and y_key == "tokenize_ms_per_sample":
-                draw_line = False
-            if draw_line:
-                ax.plot(xs, ys, color=color, linewidth=2.0, alpha=0.9, label=name, zorder=2)
+            # For vocab sweeps, draw a light trajectory line to show the
+            # progression as vocab grows (even for tokenize-time plots).
+            if style_key == "vocab_size" and len(pairs) >= 2:
+                ls = "--" if (x_key == "avg_len" and y_key == "tokenize_ms_per_sample") else "-"
+                lw = 1.8 if ls == "--" else 2.2
+                alpha = 0.95 if is_highlight else 0.75
+                ax.plot(xs, ys, color=color, linewidth=lw, linestyle=ls, alpha=alpha, label=name, zorder=2)
+
+                if is_highlight and x_key == "distortion_hat" and y_key == "avg_len":
+                    # Endpoint labels help communicate the vocab progression.
+                    try:
+                        v0 = int(float(pairs[0][2].get("vocab_size", 0)))
+                        v1 = int(float(pairs[-1][2].get("vocab_size", 0)))
+                    except Exception:
+                        v0, v1 = 0, 0
+                    if v0 > 0:
+                        ax.annotate(
+                            str(v0),
+                            xy=(xs[0], ys[0]),
+                            xytext=(5, 5),
+                            textcoords="offset points",
+                            fontsize=8,
+                            color=color,
+                            weight="bold",
+                        )
+                    if v1 > 0:
+                        ax.annotate(
+                            str(v1),
+                            xy=(xs[-1], ys[-1]),
+                            xytext=(5, 5),
+                            textcoords="offset points",
+                            fontsize=8,
+                            color=color,
+                            weight="bold",
+                        )
 
             # Scatter points with optional marker by style_key.
             for x, y, r in pairs:
@@ -249,9 +522,14 @@ def plot_frontier(
                         marker = VOCAB_MARKERS.get(int(float(r.get("vocab_size", 0))), "o")
                     except Exception:
                         marker = "o"
-                ax.scatter([x], [y], s=42, marker=marker, color=color, edgecolors="white", linewidths=0.6, zorder=3)
+                s = 58 if is_highlight else 42
+                edge = "black" if is_highlight else "white"
+                lw = 0.9 if is_highlight else 0.6
+                z = 4 if is_highlight else 3
+                ax.scatter([x], [y], s=s, marker=marker, color=color, edgecolors=edge, linewidths=lw, zorder=z)
 
         tok_handles: list[Line2D] = []
+        tok_ls = "--" if (style_key == "vocab_size" and x_key == "avg_len" and y_key == "tokenize_ms_per_sample") else "-"
         for name in group_names:
             tok_handles.append(
                 Line2D(
@@ -259,7 +537,7 @@ def plot_frontier(
                     [0],
                     marker="o",
                     color=_tokenizer_color(name),
-                    linestyle="-" if show_vocab_lines else "None",
+                    linestyle=tok_ls if show_vocab_lines else "None",
                     label=name,
                     linewidth=2.0,
                 )

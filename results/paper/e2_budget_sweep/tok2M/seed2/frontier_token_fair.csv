@@ -1,0 +1,2 @@
+dataset,model,tokenizer,budget_mode,acc,drift_acc,avg_len,p95_len,n_params,params_m,vocab,max_len,total_tokens,total_steps,majority_train_frac,majority_test_acc,seed
+csic2010,tiny,CIT,token_fair,0.878,0.878,218.015,414,724738,0.724738,2048,512,2000000,0,0.5435,0.5538,2

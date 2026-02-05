@@ -321,8 +321,35 @@ def _plot_e3_pareto(csv_path: Path, out_dir: Path) -> None:
             by_key[(tok, bb)] = r
 
     def _scatter(ax, x_key: str, y_key: str, *, xlabel: str, ylabel: str) -> None:
+        x_log = x_key == "p95_latency_ms"
         xs_all: list[float] = []
         ys_all: list[float] = []
+
+        # Optional connectors between backbones for each tokenizer (helps reduce
+        # the "floating points" feeling when there are only a few backbones).
+        for tok in tokenizers:
+            pts: list[tuple[float, float]] = []
+            for bb in backbones:
+                r = by_key.get((tok, bb))
+                if r is None:
+                    continue
+                x = _to_float(r.get(x_key))
+                y = _to_float(r.get(y_key))
+                if x is None or y is None:
+                    continue
+                pts.append((float(x), float(y)))
+            if len(pts) >= 2:
+                pts = sorted(pts, key=lambda t: t[0])
+                is_highlight = tok == "CIT"
+                ax.plot(
+                    [p[0] for p in pts],
+                    [p[1] for p in pts],
+                    color=_tokenizer_color(tok),
+                    alpha=0.55 if is_highlight else 0.22,
+                    linewidth=2.0 if is_highlight else 1.1,
+                    zorder=1,
+                )
+
         for tok in tokenizers:
             color = _tokenizer_color(tok)
             for bb in backbones:
@@ -336,27 +363,50 @@ def _plot_e3_pareto(csv_path: Path, out_dir: Path) -> None:
                 xs_all.append(float(x))
                 ys_all.append(float(y))
                 marker = BACKBONE_MARKERS.get(bb, "o")
+                is_highlight = tok == "CIT"
                 ax.scatter(
                     [float(x)],
                     [float(y)],
-                    s=46,
+                    s=62 if is_highlight else 46,
                     marker=marker,
                     color=color,
-                    edgecolors="white",
-                    linewidths=0.6,
-                    zorder=3,
+                    edgecolors="black" if is_highlight else "white",
+                    linewidths=0.9 if is_highlight else 0.6,
+                    alpha=1.0 if is_highlight else 0.85,
+                    zorder=4 if is_highlight else 3,
                 )
 
         if xs_all:
             x0, x1 = min(xs_all), max(xs_all)
-            pad = 0.03 * max(1e-9, (x1 - x0))
-            ax.set_xlim(x0 - pad, x1 + pad)
+            if x_log and x0 > 0:
+                ax.set_xscale("log")
+                ax.set_xlim(x0 / 1.12, x1 * 1.12)
+            else:
+                pad = 0.03 * max(1e-9, (x1 - x0))
+                ax.set_xlim(x0 - pad, x1 + pad)
         if ys_all:
             y0, y1 = min(ys_all), max(ys_all)
             pad = 0.06 * max(1e-9, (y1 - y0))
             ax.set_ylim(y0 - pad, y1 + pad)
         ax.set_xlabel(xlabel)
         ax.set_ylabel(ylabel)
+        ax.text(0.98, 0.04, "better ↖", transform=ax.transAxes, ha="right", va="bottom", fontsize=8, color="#333333")
+
+        if x_key in {"avg_len", "p95_latency_ms"}:
+            r = by_key.get(("CIT", "mini"))
+            if r is not None:
+                x = _to_float(r.get(x_key))
+                y = _to_float(r.get(y_key))
+                if x is not None and y is not None:
+                    ax.annotate(
+                        "CIT",
+                        xy=(float(x), float(y)),
+                        xytext=(6, 6),
+                        textcoords="offset points",
+                        fontsize=9,
+                        weight="bold",
+                        color=_tokenizer_color("CIT"),
+                    )
 
     have_params = any("params_m" in r for r in rows)
 

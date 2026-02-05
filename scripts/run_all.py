@@ -39,7 +39,14 @@ def main():
     )
     ap.add_argument("--outroot", type=str, default="paper", help="Root folder under results/ for this full run")
     ap.add_argument("--vocabs", type=str, default="256,512,1024,2048,4096", help="Vocab sweep list (appendix frontier)")
+    ap.add_argument(
+        "--token-budgets",
+        type=str,
+        default="1M,2M,5M,10M",
+        help="Token-budget sweep list for e2_budget_sweep/e3_budget_sweep.",
+    )
     ap.add_argument("--plot", action="store_true", help="Generate plots where applicable (CSIC/frontier)")
+    ap.add_argument("--summarize", action="store_true", help="Summarize per-seed results into results/<outroot>/summary/")
     ap.add_argument(
         "--paper",
         dest="paper",
@@ -89,8 +96,10 @@ def main():
         type=str,
         default="",
         help=(
-            "Comma-separated subset of runs: e1,e2,e3,appendix_e1,appendix_e2,appendix_e3,appendix_e4 "
+            "Comma-separated subset of runs: e1,e2,e3,appendix_e1,appendix_e2,appendix_e3,appendix_e4, "
+            "e2_budget_sweep,e3_budget_sweep,summarize "
             "(legacy aliases: e0->appendix_e1, uci->appendix_e3, frontier/e4->appendix_e4). "
+            "Convenience aliases: appendix, all (paper+appendix), full (all + budget sweeps). "
             "Default: run main-paper e1,e2,e3."
         ),
     )
@@ -108,6 +117,16 @@ def main():
         "uci": "appendix_e3",
         "frontier": "appendix_e4",
         "e4": "appendix_e4",
+        # budget sweeps
+        "e2_sweep": "e2_budget_sweep",
+        "e3_sweep": "e3_budget_sweep",
+        "sweep": "budget_sweep",
+        "budget": "budget_sweep",
+        # post
+        "summary": "summarize",
+        # convenience
+        "full": "full",
+        "everything": "full",
         # convenience
         "appendix": "appendix",
         "all": "all",
@@ -115,13 +134,19 @@ def main():
     only = [alias.get(x, x) for x in only]
 
     def _expand_only(xs: list[str]) -> list[str]:
-        allowed = {"e1", "e2", "e3", "appendix_e1", "appendix_e2", "appendix_e3", "appendix_e4"}
+        allowed_base = {"e1", "e2", "e3", "appendix_e1", "appendix_e2", "appendix_e3", "appendix_e4"}
+        allowed_extra = {"e2_budget_sweep", "e3_budget_sweep", "summarize"}
+        allowed = allowed_base | allowed_extra
         if not xs:
             return []
         if "all" in xs:
+            return sorted(allowed_base)
+        if "full" in xs:
             return sorted(allowed)
         if "appendix" in xs:
             xs = [x for x in xs if x != "appendix"] + [x for x in sorted(allowed) if x.startswith("appendix_")]
+        if "budget_sweep" in xs:
+            xs = [x for x in xs if x != "budget_sweep"] + ["e2_budget_sweep", "e3_budget_sweep"]
         # Deduplicate, keep stable order
         out: list[str] = []
         for x in xs:
@@ -211,6 +236,37 @@ def main():
             if want_plots:
                 frontier_args.append("--plot")
             run("appendix_e4.py", frontier_args)
+
+    # Token-budget sweeps (run once; script handles multi-seed + multi-budget).
+    sweep_exps: list[str] = []
+    if enabled("e2_budget_sweep"):
+        sweep_exps.append("e2")
+    if enabled("e3_budget_sweep"):
+        sweep_exps.append("e3")
+    if sweep_exps:
+        sweep_exp = "all" if len(sweep_exps) > 1 else sweep_exps[0]
+        sweep_args = [
+            "--exp",
+            sweep_exp,
+            "--budgets",
+            args.token_budgets,
+            "--seeds",
+            ",".join(str(s) for s in seeds),
+            "--device",
+            args.device,
+            "--outroot",
+            args.outroot,
+            "--e2-data-dir",
+            args.e2_data_dir,
+        ]
+        if not args.auto_download:
+            sweep_args.append("--no-auto-download")
+        if want_plots:
+            sweep_args.append("--plot")
+        run("run_token_budget_sweep.py", sweep_args)
+
+    if args.summarize or enabled("summarize"):
+        run("summarize_paper_results.py", ["--run-root", args.outroot])
 
     if args.paper:
         run("export_paper_artifacts.py", ["--run-root", args.outroot])

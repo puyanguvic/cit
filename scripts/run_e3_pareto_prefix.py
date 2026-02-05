@@ -209,6 +209,10 @@ def main():
                 {
                     "tokenizer": tok_name,
                     "backbone": bb_name,
+                    "seed": int(args.seed),
+                    "vocab": int(args.vocab),
+                    "max_len": int(args.max_len),
+                    "total_tokens": int(args.total_tokens),
                     "acc": acc,
                     "avg_len": avg_len,
                     "p95_len": p95,

@@ -133,6 +133,15 @@ and export paper-ready artifacts under:
 and (by default) sync the figures referenced by `paper.tex`/`appendix.tex` into:
 - `Figs/`
 
+If you re-run experiments and want to refresh just the paper-ready PDFs + `Figs/` to match the current LaTeX references:
+
+```bash
+.venv/bin/python scripts/export_paper_artifacts.py --run-root paper
+.venv/bin/python scripts/sync_figs.py --run-root paper --tex paper.tex --tex appendix.tex --clean
+```
+
+`--clean` keeps only figures referenced via `\includegraphics{Figs/...}` in the provided `.tex` files.
+
 To also run appendix sweeps:
 
 ```bash
@@ -150,6 +159,12 @@ To run multiple seeds and aggregate:
 ```bash
 python scripts/run_all.py --device cuda --seeds 0,1,2
 python scripts/summarize_paper_results.py --run-root paper
+```
+
+To densify plots via a token-budget sweep (runs E2/E3 across multiple `--total-tokens` values and writes sweep summaries under `results/<outroot>/*_budget_sweep/`):
+
+```bash
+python scripts/run_all.py --device cuda --seeds 0,1,2 --only e2_budget_sweep,e3_budget_sweep --token-budgets 1M,2M,5M,10M --plot --no-paper
 ```
 
 To run E0 (tokenizer playground) from the runner:
