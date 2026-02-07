@@ -9,10 +9,12 @@
     "device": "cuda",
     "out": "",
     "outdir": "paper/e3_budget_sweep/tok2M",
-    "seed": 0
+    "seed": 0,
+    "reuse_tokenizers": true,
+    "tokenizer_cache_dir": ""
   },
   "env": {
-    "timestamp_utc": "2026-01-30T02:32:51Z",
+    "timestamp_utc": "2026-02-07T00:22:41Z",
     "python": "3.13.7 (main, Sep 18 2025, 19:47:49) [Clang 20.1.4 ]",
     "platform": "Linux-6.8.0-87-generic-x86_64-with-glibc2.39",
     "cwd": "/home/cnlab-pu/Projects/cit",
@@ -23,7 +25,7 @@
     "cuda_device_0": "NVIDIA GeForce RTX 4090",
     "git": {
       "root": "/home/cnlab-pu/Projects/cit",
-      "sha": "ce8bbaa2d0f230d316efdffe32bcd2ba7881dd98",
+      "sha": "7ba42da590803595cd697d1fae3136e71a9cdac8",
       "dirty": true
     }
   }

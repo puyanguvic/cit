@@ -4,7 +4,7 @@
 \label{sec:appendix_experiments}
 
 This appendix reports complementary evidence supporting the main-paper claims and clarifies controls that disentangle interface effects from optimization artifacts.
-We group results into (i) scans of widely used pretrained tokenizers as drop-in interfaces, (ii) a step-fair control for CSIC end-to-end training, (iii) additional public tabular benchmarks, and (iv) a vocabulary-budget frontier sweep.
+We group results into (i) scans of widely used pretrained tokenizers as drop-in structured interfaces, (ii) a step-fair control for CSIC end-to-end training, (iii) additional public tabular benchmarks, and (iv) a vocabulary-budget sweep that traces interface trade-offs.
 
 \subsection{Appendix E1: Pretrained Tokenizer Scan on Structured Inputs}
 \label{sec:appendix_e1_tokscan}
@@ -14,57 +14,20 @@ We report token-length distributions (avg./P95/P99) and truncation rates at a fi
 This experiment is intentionally \emph{not} compute-matched: pretrained tokenizers differ in vocabulary size, training data, and special-token conventions.
 The goal is to quantify the practical severity of interface cost and truncation risk under common off-the-shelf choices when applied to structured streams.
 Table~\ref{tab:appendix_e0_tokenizer_playground} reports token-length and truncation statistics on CSIC 2010 under common pretrained tokenizers.
+\input{results/paper/paper_artifacts/appendix/tables/e0_tokenizer_playground.tex}
 
-\begin{table}[t]
-\centering
-\small
-\begin{tabular}{lllrrrrr}
-\toprule
-Dataset & Split & Tokenizer & avg\_len & p95\_len & p99\_len & trunc\_rate@L$_{\max}$ (\%) & tokenize ms/sample \\
-\midrule
-csic2010 & test & bert-base-cased & 468.3 & 687 & 803 & 29.4 & 0.33 \\
-csic2010 & test & gpt2 & 413.9 & 620 & 723 & 25.2 & 0.18 \\
-csic2010 & test & gpt3 & 413.7 & 620 & 723 & 25.1 & 0.20 \\
-csic2010 & test & gpt35 & 359.5 & 547 & 639 & 7.3 & 0.20 \\
-csic2010 & test & gpt4 & 359.5 & 547 & 639 & 7.3 & 0.20 \\
-csic2010 & test & grok1 & 374.7 & 563 & 663 & 9.8 & 0.16 \\
-\bottomrule
-\end{tabular}
-\caption{Appendix E1: pretrained tokenizer length/truncation scan on CSIC 2010 (seed0).}
-\label{tab:appendix_e0_tokenizer_playground}
-\end{table}
+\paragraph{Takeaway.}
+The truncation rates and heavy-tailed token lengths in Table~\ref{tab:appendix_e0_tokenizer_playground} show that interface cost is a practical bottleneck under standard encoder limits, motivating budget-matched and contract-aware interfaces rather than drop-in reuse of natural-language tokenizers.
 
 \subsection{Appendix E2: Step-Fair Control on CSIC 2010 HTTP}
 \label{sec:appendix_e2_stepfair}
 
-Token-fair budgets equalize the total number of non-padding encoder tokens processed, which makes interface efficiency directly translate into more parameter updates and faster learning in wall-clock and in steps.
-To separate gains due to improved token efficiency from gains due to interface correctness, we provide a step-fair control on CSIC that matches the number of optimizer steps across tokenizers while keeping all other settings fixed.
-The step-fair control preserves the qualitative robustness advantage of CIT under semantics-preserving drift, while attenuating some of the accuracy differences seen under token-fair budgets.
-This is consistent with robustness arising primarily from the interface (collapse vs.\ no collapse), and with part of the token-fair accuracy gains arising from higher effective sample throughput.
-Table~\ref{tab:appendix_e2_step_fair} and Figure~\ref{fig:appendix_e2_step_fair_frontier} report the step-fair outcomes.
-
-\begin{table}[t]
-\centering
-\small
-\begin{tabular}{llrrrr}
-\toprule
-Model & Tokenizer & Acc. & Drift acc. & avg\_len & p95\_len \\
-\midrule
-small & BPE & 0.907 & 0.505 & 327.2 & 514 \\
-small & Bytes & 0.689 & 0.442 & 785.3 & 1059 \\
-small & CIT & 0.906 & 0.906 & 217.0 & 416 \\
-small & Unigram & 0.872 & 0.871 & 406.4 & 595 \\
-small & WordPiece & 0.915 & 0.475 & 329.4 & 526 \\
-tiny & BPE & 0.849 & 0.466 & 327.2 & 514 \\
-tiny & Bytes & 0.686 & 0.443 & 785.3 & 1059 \\
-tiny & CIT & 0.887 & 0.887 & 217.0 & 416 \\
-tiny & Unigram & 0.818 & 0.815 & 406.4 & 595 \\
-tiny & WordPiece & 0.896 & 0.497 & 329.4 & 526 \\
-\bottomrule
-\end{tabular}
-\caption{Appendix E2 (CSIC 2010 HTTP) step-fair summary (seed0).}
-\label{tab:appendix_e2_step_fair}
-\end{table}
+Token-fair budgets equalize the total number of non-padding encoder tokens processed, which makes interface efficiency translate into more parameter updates (more steps) for lower-rate tokenizers.
+To separate step-count effects from interface correctness, we provide a step-fair control on CSIC that matches the number of optimizer steps across tokenizers while keeping all other settings fixed.
+The step-fair control preserves CIT's robustness under semantics-preserving drift while attenuating some token-fair accuracy differences.
+This supports the interpretation that robustness gains are primarily interface-driven, while a portion of token-fair accuracy gains can arise from improved token efficiency.
+Table~\ref{tab:appendix_e2_csic_step_fair} and Figure~\ref{fig:appendix_e2_step_fair_frontier} report the step-fair outcomes.
+\input{results/paper/paper_artifacts/appendix/tables/e2_csic_step_fair.tex}
 
 \begin{figure}[t]
 \centering
@@ -79,24 +42,8 @@ tiny & WordPiece & 0.896 & 0.497 & 329.4 & 526 \\
 We additionally evaluate on public tabular benchmarks (Adult and Credit-G) under the same drop-in constraints and token-fair training protocol.
 These datasets provide a complementary regime to CSIC: inputs are structured but less adversarial, and accuracy is less sensitive to robustness operators.
 We report rate, surrogate distortion, and end-to-end accuracy, and observe the same general trend that interface-specialized tokenization improves rate--distortion trade-offs without sacrificing downstream utility under matched budgets.
-Table~\ref{tab:appendix_uci} summarizes results on Credit-G.
-
-\begin{table}[t]
-\centering
-\small
-\begin{tabular}{llrrrr}
-\toprule
-Dataset & Tokenizer & Acc. & avg\_len & p95\_len & Distortion $\hat{\Delta}$ \\
-\midrule
-credit-g & BPE & 0.705 & 141.8 & 151 & 0.097 \\
-credit-g & CIT & 0.685 & 99.1 & 113 & 0.080 \\
-credit-g & Unigram & 0.705 & 321.4 & 339 & 0.169 \\
-credit-g & WordPiece & 0.695 & 141.7 & 150 & 0.100 \\
-\bottomrule
-\end{tabular}
-\caption{Appendix E3: UCI benchmarks summary (seed0).}
-\label{tab:appendix_uci}
-\end{table}
+Table~\ref{tab:appendix_uci} summarizes results across datasets.
+\input{results/paper/paper_artifacts/appendix/tables/uci.tex}
 
 \subsection{Appendix E4: Vocabulary-Budget Frontier}
 \label{sec:appendix_e4_frontier}
@@ -105,34 +52,9 @@ Finally, we sweep vocabulary budgets to trace empirical rate--distortion trade-o
 For each vocabulary size, we train each tokenizer on the same training serialization and evaluate (avg./P95) token length, surrogate distortion $\widehat{\Delta}(\tau)$, and tokenization time.
 This sweep illustrates how interface constraints and distortion-aware induction shift the frontier, yielding better operating points under tight budgets.
 
-Table~\ref{tab:appendix_frontier} reports the aggregated sweep results, and Figure~\ref{fig:appendix_frontier} visualizes the corresponding rate--distortion and tokenization-time trade-offs. (End-to-end accuracy frontiers require full encoder fine-tuning; we focus this sweep on interface metrics.)
-\begin{table}[t]
-\centering
-\small
-\begin{tabular}{rlrrrr}
-\toprule
-Vocab & Tokenizer & avg\_len & p95\_len & Distortion $\hat{\Delta}$ & tokenize ms/sample \\
-\midrule
-256 & BPE & 116.4 & 128 & 0.187 & 0.05 \\
-256 & WordPiece & 124.5 & 136 & 0.211 & 0.09 \\
-256 & CIT & 120.6 & 132 & 0.258 & 0.05 \\
-512 & BPE & 107.6 & 113 & 0.186 & 0.07 \\
-512 & WordPiece & 108.1 & 114 & 0.180 & 0.07 \\
-512 & CIT & 99.6 & 111 & 0.206 & 0.03 \\
-1024 & BPE & 106.8 & 112 & 0.203 & 0.04 \\
-1024 & WordPiece & 107.0 & 112 & 0.198 & 0.04 \\
-1024 & CIT & 72.2 & 82 & 0.144 & 0.05 \\
-2048 & BPE & 106.3 & 111 & 0.206 & 0.08 \\
-2048 & WordPiece & 106.4 & 112 & 0.185 & 0.07 \\
-2048 & CIT & 60.5 & 69 & 0.138 & 0.03 \\
-4096 & BPE & 106.1 & 111 & 0.207 & 0.07 \\
-4096 & WordPiece & 106.1 & 111 & 0.190 & 0.04 \\
-4096 & CIT & 58.0 & 60 & 0.123 & 0.03 \\
-\bottomrule
-\end{tabular}
-\caption{Appendix: vocab-budget frontier sweep.}
-\label{tab:appendix_frontier}
-\end{table}
+Table~\ref{tab:appendix_frontier} reports the aggregated sweep results, and Figure~\ref{fig:appendix_frontier} visualizes the corresponding rate--distortion and tokenization-time trade-offs.
+End-to-end accuracy frontiers require full encoder training at each budget; here we use the sweep to characterize the interface-level operating points (rate, distortion, and runtime).
+\input{results/paper/paper_artifacts/appendix/tables/frontier.tex}
 \begin{figure}[t]
 \centering
 \includegraphics[width=0.48\linewidth]{Figs/frontier_len_vs_distortion.pdf}

@@ -20,10 +20,12 @@
     "n_train": 20000,
     "n_val": 5000,
     "n_test": 5000,
-    "auto_download": true
+    "auto_download": true,
+    "reuse_tokenizers": true,
+    "tokenizer_cache_dir": ""
   },
   "env": {
-    "timestamp_utc": "2026-01-29T22:59:33Z",
+    "timestamp_utc": "2026-02-06T23:26:00Z",
     "python": "3.13.7 (main, Sep 18 2025, 19:47:49) [Clang 20.1.4 ]",
     "platform": "Linux-6.8.0-87-generic-x86_64-with-glibc2.39",
     "cwd": "/home/cnlab-pu/Projects/cit",
@@ -34,7 +36,7 @@
     "cuda_device_0": "NVIDIA GeForce RTX 4090",
     "git": {
       "root": "/home/cnlab-pu/Projects/cit",
-      "sha": "ce8bbaa2d0f230d316efdffe32bcd2ba7881dd98",
+      "sha": "7ba42da590803595cd697d1fae3136e71a9cdac8",
       "dirty": true
     }
   }

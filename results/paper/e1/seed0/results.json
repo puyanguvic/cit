@@ -13,10 +13,10 @@
     },
     {
       "tokenizer": "WordPiece",
-      "test_acc": 0.0445,
-      "drift_acc": 0.029000000000000005,
-      "rate_E_len": 648.1455,
-      "distortion_hat": 2.4097026757938167,
+      "test_acc": 0.051,
+      "drift_acc": 0.057,
+      "rate_E_len": 648.1445,
+      "distortion_hat": 2.4316539394918424,
       "oracle_acc": 0.0555,
       "oracle_drift_acc": 0.08,
       "seed": 0,
@@ -25,7 +25,7 @@
     {
       "tokenizer": "Unigram",
       "test_acc": 0.0555,
-      "drift_acc": 0.052000000000000005,
+      "drift_acc": 0.053,
       "rate_E_len": 691.717,
       "distortion_hat": 2.3997462457255754,
       "oracle_acc": 0.0555,
@@ -52,6 +52,28 @@
       "distortion_hat": 1.2000153627700054,
       "oracle_acc": 0.5061875,
       "oracle_drift_acc": 0.39825,
+      "seed": 0,
+      "vocab": 2048
+    },
+    {
+      "tokenizer": "CIT_no_typed",
+      "test_acc": 0.0565,
+      "drift_acc": 0.047,
+      "rate_E_len": 859.028,
+      "distortion_hat": 2.9096163887992406,
+      "oracle_acc": 0.0555,
+      "oracle_drift_acc": 0.08,
+      "seed": 0,
+      "vocab": 2048
+    },
+    {
+      "tokenizer": "CIT_no_contract",
+      "test_acc": 0.043,
+      "drift_acc": 0.053,
+      "rate_E_len": 846.1135,
+      "distortion_hat": 2.7518357420692805,
+      "oracle_acc": 0.0555,
+      "oracle_drift_acc": 0.08,
       "seed": 0,
       "vocab": 2048
     }

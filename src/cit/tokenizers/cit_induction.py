@@ -31,14 +31,19 @@ class InductionCfg:
     candidate_batch: int = 256
     # In both modes: log metrics every N additions (0 disables).
     log_every: int = 50
+    # Interface toggles for ablations.
+    # If False, skip typed-symbol normalization before induction/runtime.
+    apply_contract_text: bool = True
+    # If False, allow candidate tokens to cross '=' boundaries.
+    enforce_equals_boundary: bool = True
     seed: int = 0
 
 
 def _collect_candidates(texts: List[str], cfg: InductionCfg) -> Dict[str, int]:
     """Collect substring candidates from plain segments.
 
-    We treat '<...>' atoms and '=' as hard boundaries and never propose candidates
-    that cross them.
+    We treat '<...>' atoms as hard boundaries. '=' boundaries are optional and
+    controlled by cfg.enforce_equals_boundary for ablation studies.
     """
     rng = np.random.default_rng(cfg.seed)
     idx = np.arange(min(len(texts), cfg.max_texts_for_candidates))
@@ -54,8 +59,9 @@ def _collect_candidates(texts: List[str], cfg: InductionCfg) -> Dict[str, int]:
             if chunk.startswith("<") and chunk.endswith(">"):
                 counts[chunk] = counts.get(chunk, 0) + 1
                 continue
-            # do not cross '='; split into subchunks
-            for sub in chunk.split("="):
+            # Optionally enforce '=' boundaries (default: enabled).
+            parts = chunk.split("=") if cfg.enforce_equals_boundary else [chunk]
+            for sub in parts:
                 if not sub:
                     continue
                 L = len(sub)
@@ -64,7 +70,7 @@ def _collect_candidates(texts: List[str], cfg: InductionCfg) -> Dict[str, int]:
                         s = sub[a:b]
                         counts[s] = counts.get(s, 0) + 1
         # also keep separators as tokens if present
-        if "=" in t:
+        if cfg.enforce_equals_boundary and "=" in t:
             counts["="] = counts.get("=", 0) + t.count("=")
 
         if len(counts) >= cfg.max_total_candidates:
@@ -91,7 +97,10 @@ def _init_vocab(texts: List[str], cfg: InductionCfg) -> Dict[str, int]:
         if m not in vocab:
             vocab[m] = len(vocab)
     # structural tokens
-    for tok in ["=", "<SEP>", "<REC>", "<END>"]:
+    structural = ["<SEP>", "<REC>", "<END>"]
+    if cfg.enforce_equals_boundary:
+        structural = ["="] + structural
+    for tok in structural:
         if tok not in vocab:
             vocab[tok] = len(vocab)
     return vocab
@@ -153,8 +162,11 @@ def train_cit(
     rng = np.random.default_rng(cfg.seed)
     y = np.asarray(labels, dtype=np.int64)
 
-    # apply contract
-    texts = [apply_contract(t, contract) for t in raw_texts]
+    # Apply typed-symbol contract unless explicitly disabled for ablation.
+    if cfg.apply_contract_text:
+        texts = [apply_contract(t, contract) for t in raw_texts]
+    else:
+        texts = list(raw_texts)
 
     vocab = _init_vocab(texts, cfg)
     candidates = _collect_candidates(texts, cfg)

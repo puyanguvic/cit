@@ -1,11 +1,16 @@
 #!/usr/bin/env python3
 """One-click runner for CIT paper experiments.
 
-Runs the main-paper E1/E2/E3 experiments (and optionally appendix runs).
+Runs the full experiment suite by default:
+  - main paper: E1/E2/E3
+  - appendix: appendix_e1/appendix_e2/appendix_e3/appendix_e4
+  - token-budget sweeps: e2_budget_sweep/e3_budget_sweep
+  - post-processing: summarize + paper artifact export (+ Figs sync)
 All outputs are saved under results/<outdir>/seedK/...
 
 Examples:
   python scripts/run_all.py --device cuda --seed 0
+  python scripts/run_all.py --only e1,e2,e3
   python scripts/run_all.py --only e2 --plot
   python scripts/run_all.py --only appendix_e1,appendix_e4 --plot
 
@@ -100,7 +105,7 @@ def main():
             "e2_budget_sweep,e3_budget_sweep,summarize "
             "(legacy aliases: e0->appendix_e1, uci->appendix_e3, frontier/e4->appendix_e4). "
             "Convenience aliases: appendix, all (paper+appendix), full (all + budget sweeps). "
-            "Default: run main-paper e1,e2,e3."
+            "Default: run full suite (paper + appendix + budget sweeps + summarize)."
         ),
     )
     ap.set_defaults(auto_download=True, paper=True, sync_figs=True)
@@ -160,7 +165,18 @@ def main():
 
     def enabled(k: str) -> bool:
         if not only:
-            return k in {"e1", "e2", "e3"}
+            return k in {
+                "e1",
+                "e2",
+                "e3",
+                "appendix_e1",
+                "appendix_e2",
+                "appendix_e3",
+                "appendix_e4",
+                "e2_budget_sweep",
+                "e3_budget_sweep",
+                "summarize",
+            }
         return k in only
 
     want_any_appendix = any(

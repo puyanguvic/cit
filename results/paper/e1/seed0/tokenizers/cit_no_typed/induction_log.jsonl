@@ -1,0 +1,6 @@
+{"step": -1, "vocab_size": 9, "base_rate": 933.228, "base_dist": 0.33449691512480667}
+{"step": 50, "token": "E", "vocab_size": 51, "rate": 935.448, "dist": 1.016279492475136, "score": 115.0, "mode": "fast"}
+{"step": 100, "token": "k_signal", "vocab_size": 101, "rate": 902.839, "dist": 2.280338631758923, "score": 63.0, "mode": "fast"}
+{"step": 150, "token": "Th", "vocab_size": 151, "rate": 888.847, "dist": 2.2146817624653248, "score": 6.0, "mode": "fast"}
+{"step": 200, "token": "af", "vocab_size": 201, "rate": 876.38, "dist": 2.1201273130895606, "score": 5.0, "mode": "fast"}
+{"step": 250, "token": "BR", "vocab_size": 251, "rate": 868.839, "dist": 1.8796290047295212, "score": 5.0, "mode": "fast"}

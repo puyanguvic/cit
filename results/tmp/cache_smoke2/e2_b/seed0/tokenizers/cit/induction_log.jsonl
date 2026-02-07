@@ -1,0 +1,11 @@
+{"step": -1, "vocab_size": 13, "base_rate": 543.8875, "base_dist": 0.3672743580632136}
+{"step": 50, "token": "C_", "vocab_size": 51, "rate": 543.1, "dist": 0.197530205958368, "score": 560.0, "mode": "fast"}
+{"step": 100, "token": ";q", "vocab_size": 101, "rate": 501.825, "dist": 0.30520413591921147, "score": 216.0, "mode": "fast"}
+{"step": 150, "token": "_LON", "vocab_size": 151, "rate": 469.0, "dist": 0.40785971371445573, "score": 486.0, "mode": "fast"}
+{"step": 200, "token": "LL>", "vocab_size": 201, "rate": 440.55, "dist": 0.43881263505202245, "score": 278.0, "mode": "fast"}
+{"step": 250, "token": "SC_EQ>0.5", "vocab_size": 251, "rate": 411.05, "dist": 0.3467368754484736, "score": 904.0, "mode": "fast"}
+{"step": 300, "token": "ntent-", "vocab_size": 301, "rate": 385.6625, "dist": 0.3947742987052036, "score": 490.0, "mode": "fast"}
+{"step": 350, "token": "lica", "vocab_size": 351, "rate": 364.15, "dist": 0.32897016385492134, "score": 261.0, "mode": "fast"}
+{"step": 400, "token": "-cache", "vocab_size": 401, "rate": 361.0, "dist": 0.24743835463882657, "score": 425.0, "mode": "fast"}
+{"step": 450, "token": "/xml,appl", "vocab_size": 451, "rate": 341.925, "dist": 0.26048234210387994, "score": 592.0, "mode": "fast"}
+{"step": 500, "token": ",appli", "vocab_size": 501, "rate": 341.175, "dist": 0.23827813731008343, "score": 370.0, "mode": "fast"}

@@ -1,0 +1,30 @@
+{
+  "experiment": "e3_pareto",
+  "args": {
+    "vocab": 512,
+    "max_len": 128,
+    "total_tokens": 2000,
+    "model_families": "mini",
+    "full_finetune": true,
+    "device": "cpu",
+    "out": "",
+    "outdir": "tmp/cache_smoke2/e3_a",
+    "seed": 0,
+    "reuse_tokenizers": true,
+    "tokenizer_cache_dir": ""
+  },
+  "env": {
+    "timestamp_utc": "2026-02-06T23:16:53Z",
+    "python": "3.11.9 (main, Jul 31 2025, 11:37:42) [GCC 13.3.0]",
+    "platform": "Linux-6.8.0-87-generic-x86_64-with-glibc2.39",
+    "cwd": "/home/cnlab-pu/Projects/cit",
+    "torch_version": "2.7.1+cu126",
+    "cuda_built": true,
+    "cuda_available": false,
+    "git": {
+      "root": "/home/cnlab-pu/Projects/cit",
+      "sha": "7ba42da590803595cd697d1fae3136e71a9cdac8",
+      "dirty": true
+    }
+  }
+}

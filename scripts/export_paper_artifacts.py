@@ -75,6 +75,16 @@ def _read_csv(path: Path) -> list[dict]:
         return [dict(row) for row in r]
 
 
+def _write_csv(rows: list[dict], out_path: Path) -> None:
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    if not rows:
+        return
+    with out_path.open("w", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
+        w.writeheader()
+        w.writerows(rows)
+
+
 def _to_float(x: object) -> float | None:
     if x is None:
         return None
@@ -283,6 +293,259 @@ def _pick_dir_with_seed_csv_recursive(candidates: list[Path], csv_name: str) -> 
 def _pick_seed_dir(exp_dir: Path) -> Path | None:
     seeds = _seed_dirs(exp_dir)
     return seeds[0] if seeds else None
+
+
+def _summary_rows_to_mean_std(rows: list[dict], *, metric_keys: list[str]) -> list[dict]:
+    """Convert rows with metric + metric_std columns into metric_mean/metric_std."""
+    out_rows: list[dict] = []
+    for r in rows:
+        out: dict[str, object] = dict(r)
+        n = _to_float(r.get("n"))
+        out["n"] = int(n) if n is not None else 1
+        for mk in metric_keys:
+            out[f"{mk}_mean"] = _to_float(r.get(mk))
+            out[f"{mk}_std"] = _to_float(r.get(f"{mk}_std"))
+        out_rows.append(out)
+    return out_rows
+
+
+def _choose_budget(
+    rows: list[dict],
+    *,
+    preferred: int | None = None,
+    budget_key: str = "total_tokens",
+) -> int | None:
+    budgets = sorted(
+        {
+            int(v)
+            for v in (_to_float(r.get(budget_key)) for r in rows)
+            if v is not None and v > 0
+        }
+    )
+    if not budgets:
+        return None
+    if preferred is not None and preferred in budgets:
+        return preferred
+    return budgets[-1]
+
+
+def _rows_at_budget(rows: list[dict], *, budget: int, budget_key: str = "total_tokens") -> list[dict]:
+    out: list[dict] = []
+    for r in rows:
+        v = _to_float(r.get(budget_key))
+        if v is None:
+            continue
+        if int(v) == int(budget):
+            out.append(r)
+    return out
+
+
+def _plot_e2_budget_scaling(summary_rows: list[dict], *, out_dir: Path, name: str) -> bool:
+    try:
+        import matplotlib.pyplot as plt
+        import matplotlib.ticker as mticker
+    except Exception:
+        print("[warn] matplotlib not available; skipping E2 budget-scaling plot.")
+        return False
+
+    if not summary_rows:
+        return False
+
+    _apply_mpl_style()
+    models = [m for m in ["tiny", "small", "base"] if any(str(r.get("model", "")) == m for r in summary_rows)]
+    if not models:
+        models = sorted({str(r.get("model", "")) for r in summary_rows if str(r.get("model", ""))})
+    tokenizers = sorted({str(r.get("tokenizer", "")) for r in summary_rows if str(r.get("tokenizer", ""))})
+    tokenizers = sorted(tokenizers, key=lambda n: (0, n) if n in TOKENIZER_COLORS else (1, n))
+
+    fig, axes = plt.subplots(
+        1,
+        max(1, len(models)),
+        figsize=(10.4 if len(models) > 1 else 6.6, 3.2),
+        sharey=True,
+    )
+    try:
+        axes_list = list(axes)  # type: ignore[arg-type]
+    except TypeError:
+        axes_list = [axes]  # type: ignore[list-item]
+
+    def _fmt_tokens(x, _pos=None) -> str:
+        x = float(x)
+        if x >= 1_000_000:
+            v = x / 1_000_000.0
+            return f"{int(round(v))}M" if abs(v - round(v)) < 1e-8 else f"{v:.1f}M"
+        if x >= 1_000:
+            v = x / 1_000.0
+            return f"{int(round(v))}k" if abs(v - round(v)) < 1e-8 else f"{v:.1f}k"
+        return str(int(round(x)))
+
+    for ax, model in zip(axes_list, models, strict=False):
+        mrows = [r for r in summary_rows if str(r.get("model", "")) == model]
+        for tok in tokenizers:
+            pts = []
+            for r in mrows:
+                if str(r.get("tokenizer", "")) != tok:
+                    continue
+                x = _to_float(r.get("total_tokens"))
+                acc = _to_float(r.get("acc"))
+                drift = _to_float(r.get("drift_acc"))
+                if x is None or acc is None or drift is None:
+                    continue
+                pts.append((x, acc, drift))
+            if not pts:
+                continue
+            pts.sort(key=lambda t: t[0])
+            xs = [p[0] for p in pts]
+            ys = [p[1] for p in pts]
+            ys_drift = [p[2] for p in pts]
+            color = _tokenizer_color(tok)
+            is_highlight = tok == "CIT"
+            ax.plot(
+                xs,
+                ys,
+                color=color,
+                linewidth=2.2 if is_highlight else 1.2,
+                alpha=0.95 if is_highlight else 0.8,
+                marker="o",
+                markersize=5.5,
+                linestyle="-",
+                label=tok if model == models[0] else None,
+            )
+            ax.plot(
+                xs,
+                ys_drift,
+                color=color,
+                linewidth=1.8 if is_highlight else 1.0,
+                alpha=0.85 if is_highlight else 0.65,
+                marker="o",
+                markersize=4.2,
+                linestyle="--",
+            )
+
+        ax.set_xscale("log")
+        ax.xaxis.set_major_locator(mticker.LogLocator(base=10, subs=(1.0, 2.0, 5.0)))
+        ax.xaxis.set_major_formatter(mticker.FuncFormatter(_fmt_tokens))
+        ax.xaxis.get_offset_text().set_visible(False)
+        ax.set_xlabel("token budget")
+        ax.set_title(model)
+        ax.grid(True, alpha=0.25)
+        ax.text(0.98, 0.04, "better ↖", transform=ax.transAxes, ha="right", va="bottom", fontsize=8, color="#333333")
+
+    axes_list[0].set_ylabel("accuracy")
+    handles, labels = axes_list[0].get_legend_handles_labels()
+    if handles:
+        fig.legend(
+            handles=handles,
+            labels=labels,
+            loc="upper center",
+            bbox_to_anchor=(0.5, 1.12),
+            ncol=min(5, len(handles)),
+            frameon=False,
+        )
+    fig.text(0.99, 0.015, "solid: test acc, dashed: drift acc", ha="right", va="bottom", fontsize=8, color="#555555")
+
+    fig.tight_layout(rect=(0.0, 0.02, 1.0, 0.96))
+    out_dir.mkdir(parents=True, exist_ok=True)
+    fig.savefig(out_dir / f"{name}.pdf", bbox_inches="tight")
+    fig.savefig(out_dir / f"{name}.png", dpi=220, bbox_inches="tight")
+    plt.close(fig)
+    return True
+
+
+def _plot_e3_budget_scaling(summary_rows: list[dict], *, out_dir: Path, name: str) -> bool:
+    try:
+        import matplotlib.pyplot as plt
+        import matplotlib.ticker as mticker
+    except Exception:
+        print("[warn] matplotlib not available; skipping E3 budget-scaling plot.")
+        return False
+
+    if not summary_rows:
+        return False
+
+    _apply_mpl_style()
+    backbones = [m for m in ["mini", "small", "base"] if any(str(r.get("backbone", "")) == m for r in summary_rows)]
+    if not backbones:
+        backbones = sorted({str(r.get("backbone", "")) for r in summary_rows if str(r.get("backbone", ""))})
+    tokenizers = sorted({str(r.get("tokenizer", "")) for r in summary_rows if str(r.get("tokenizer", ""))})
+    tokenizers = sorted(tokenizers, key=lambda n: (0, n) if n in TOKENIZER_COLORS else (1, n))
+
+    fig, axes = plt.subplots(
+        1,
+        max(1, len(backbones)),
+        figsize=(10.4 if len(backbones) > 1 else 6.6, 3.2),
+        sharey=True,
+    )
+    try:
+        axes_list = list(axes)  # type: ignore[arg-type]
+    except TypeError:
+        axes_list = [axes]  # type: ignore[list-item]
+
+    def _fmt_tokens(x, _pos=None) -> str:
+        x = float(x)
+        if x >= 1_000_000:
+            v = x / 1_000_000.0
+            return f"{int(round(v))}M" if abs(v - round(v)) < 1e-8 else f"{v:.1f}M"
+        if x >= 1_000:
+            v = x / 1_000.0
+            return f"{int(round(v))}k" if abs(v - round(v)) < 1e-8 else f"{v:.1f}k"
+        return str(int(round(x)))
+
+    for ax, bb in zip(axes_list, backbones, strict=False):
+        bb_rows = [r for r in summary_rows if str(r.get("backbone", "")) == bb]
+        for tok in tokenizers:
+            pts = []
+            for r in bb_rows:
+                if str(r.get("tokenizer", "")) != tok:
+                    continue
+                x = _to_float(r.get("total_tokens"))
+                y = _to_float(r.get("acc"))
+                if x is None or y is None:
+                    continue
+                pts.append((x, y))
+            if not pts:
+                continue
+            pts.sort(key=lambda t: t[0])
+            xs = [p[0] for p in pts]
+            ys = [p[1] for p in pts]
+            color = _tokenizer_color(tok)
+            is_highlight = tok == "CIT"
+            ax.plot(
+                xs,
+                ys,
+                color=color,
+                linewidth=2.2 if is_highlight else 1.2,
+                alpha=0.95 if is_highlight else 0.8,
+                marker="o",
+                markersize=5.5,
+                label=tok if bb == backbones[0] else None,
+            )
+        ax.set_xscale("log")
+        ax.xaxis.set_major_locator(mticker.LogLocator(base=10, subs=(1.0, 2.0, 5.0)))
+        ax.xaxis.set_major_formatter(mticker.FuncFormatter(_fmt_tokens))
+        ax.xaxis.get_offset_text().set_visible(False)
+        ax.set_xlabel("token budget")
+        ax.set_title(bb)
+        ax.grid(True, alpha=0.25)
+        ax.text(0.98, 0.04, "better ↖", transform=ax.transAxes, ha="right", va="bottom", fontsize=8, color="#333333")
+
+    axes_list[0].set_ylabel("accuracy")
+    handles, labels = axes_list[0].get_legend_handles_labels()
+    if handles:
+        fig.legend(
+            handles=handles,
+            labels=labels,
+            loc="upper center",
+            bbox_to_anchor=(0.5, 1.12),
+            ncol=min(5, len(handles)),
+            frameon=False,
+        )
+    fig.tight_layout(rect=(0.0, 0.0, 1.0, 0.96))
+    out_dir.mkdir(parents=True, exist_ok=True)
+    fig.savefig(out_dir / f"{name}.pdf", bbox_inches="tight")
+    fig.savefig(out_dir / f"{name}.png", dpi=220, bbox_inches="tight")
+    plt.close(fig)
+    return True
 
 
 def _plot_e3_pareto(csv_path: Path, out_dir: Path) -> None:
@@ -655,6 +918,8 @@ def main() -> None:
     # E2 (CSIC HTTP): token-fair + step-fair
     e2_main_dir = _pick_dir_with_seed_csv([run_root / "e2", run_root / "e2_csic_http"], "results_token_fair.csv")
     e2_step_dir = _pick_dir_with_seed_csv([run_root / "appendix_e2"], "results_step_fair.csv")
+    e2_sweep_summary_path = run_root / "e2_budget_sweep" / "summary_token_fair.csv"
+    e2_sweep_rows = _read_csv(e2_sweep_summary_path) if e2_sweep_summary_path.exists() else []
 
     e2_token_csvs: list[Path] = []
     if e2_main_dir is not None:
@@ -667,7 +932,35 @@ def main() -> None:
         e2_step_csvs = [
             p / "results_step_fair.csv" for p in _seed_dirs(e2_step_dir) if (p / "results_step_fair.csv").exists()
         ]
-    if e2_token_csvs:
+
+    if e2_sweep_rows:
+        # Prefer multi-seed sweep summary for the main E2 table.
+        target_budget = _choose_budget(e2_sweep_rows, preferred=10_000_000)
+        e2_table_raw = _rows_at_budget(e2_sweep_rows, budget=target_budget or 0)
+        e2_table_raw = [r for r in e2_table_raw if str(r.get("budget_mode", "")) in {"token_fair", "token"}]
+        e2_table = _summary_rows_to_mean_std(
+            e2_table_raw,
+            metric_keys=["acc", "drift_acc", "avg_len", "p95_len"],
+        )
+        if e2_table:
+            _write_latex_table(
+                e2_table,
+                columns=[
+                    Col("model", "Model", align="l"),
+                    Col("tokenizer", "Tokenizer", align="l"),
+                    Col("acc", "Acc.", align="r", metric="acc", digits=3),
+                    Col("drift_acc", "Drift acc.", align="r", metric="drift_acc", digits=3),
+                    Col("avg_len", "avg\\_len", align="r", metric="avg_len", digits=1),
+                    Col("p95_len", "p95\\_len", align="r", metric="p95_len", digits=0, kind="int"),
+                ],
+                out_path=main_tables_dir / "e2_csic_token_fair.tex",
+                caption=f"E2 (CSIC 2010 HTTP) token-fair summary across seeds at {target_budget:,} training tokens.",
+                label="tab:e2_csic_token_fair",
+            )
+            wrote_tables += 1
+        if _plot_e2_budget_scaling(e2_sweep_rows, out_dir=main_figs_dir, name="e2_csic_budget_scaling"):
+            wrote_figs += 2
+    elif e2_token_csvs:
         e2_token_rows = _collect_many(e2_token_csvs)
         e2_token_sum = _group_stats(
             e2_token_rows,
@@ -782,8 +1075,49 @@ def main() -> None:
 
     # E3 (Pareto slice)
     e3_dir = _pick_dir_with_seed_csv([run_root / "e3", run_root / "e3_pareto"], "results.csv")
+    e3_sweep_summary_path = run_root / "e3_budget_sweep" / "summary.csv"
+    e3_sweep_rows = _read_csv(e3_sweep_summary_path) if e3_sweep_summary_path.exists() else []
     e3_csvs = [] if e3_dir is None else [p / "results.csv" for p in _seed_dirs(e3_dir) if (p / "results.csv").exists()]
-    if e3_csvs:
+    e3_fig_generated = False
+    if e3_sweep_rows:
+        target_budget = _choose_budget(e3_sweep_rows, preferred=5_000_000)
+        e3_table_raw = _rows_at_budget(e3_sweep_rows, budget=target_budget or 0)
+        e3_table = _summary_rows_to_mean_std(
+            e3_table_raw,
+            metric_keys=["acc", "avg_len", "p95_len", "distortion_hat", "p95_latency_ms", "params_m"],
+        )
+        if e3_table:
+            _write_latex_table(
+                e3_table,
+                columns=[
+                    Col("backbone", "Backbone", align="l"),
+                    Col("tokenizer", "Tokenizer", align="l"),
+                    Col("params_m", "Params (M)", align="r", metric="params_m", digits=2),
+                    Col("acc", "Acc.", align="r", metric="acc", digits=3),
+                    Col("avg_len", "avg\\_len", align="r", metric="avg_len", digits=1),
+                    Col("p95_len", "p95\\_len", align="r", metric="p95_len", digits=0, kind="int"),
+                    Col("distortion_hat", "Distortion $\\hat{\\Delta}$", align="r", metric="distortion_hat", digits=3),
+                    Col("p95_latency_ms", "p95 latency (ms)", align="r", metric="p95_latency_ms", digits=2),
+                ],
+                out_path=main_tables_dir / "e3_pareto.tex",
+                caption=f"E3 (Pareto slice) summary across seeds at {target_budget:,} training tokens.",
+                label="tab:e3_pareto",
+            )
+            wrote_tables += 1
+
+            # Generate the Pareto triptych from the selected budget slice.
+            tmp_e3_csv = outroot / "_tmp_e3_pareto_budget.csv"
+            _write_csv(e3_table_raw, tmp_e3_csv)
+            _plot_e3_pareto(tmp_e3_csv, main_figs_dir)
+            try:
+                tmp_e3_csv.unlink()
+            except Exception:
+                pass
+            e3_fig_generated = True
+            wrote_figs += 2
+        if _plot_e3_budget_scaling(e3_sweep_rows, out_dir=main_figs_dir, name="e3_budget_scaling"):
+            wrote_figs += 2
+    elif e3_csvs:
         e3_rows = _collect_many(e3_csvs)
         e3_sum = _group_stats(
             e3_rows,
@@ -922,9 +1256,10 @@ def main() -> None:
                 copied += 1
                 wrote_figs += 1
 
-    # E3 figures (main): generated
+    # E3 figures (main): generated (fallback to seed-level runs if sweep-based
+    # figure was not already produced above).
     e3_seed = _pick_seed_dir(e3_dir) if e3_dir is not None else None
-    if e3_seed is not None and (e3_seed / "results.csv").exists():
+    if (not e3_fig_generated) and e3_seed is not None and (e3_seed / "results.csv").exists():
         _plot_e3_pareto(e3_seed / "results.csv", main_figs_dir)
         wrote_figs += 2  # pdf+png pairs per plot; approximate for reporting
 
@@ -954,10 +1289,10 @@ def main() -> None:
     manifest_lines.append("## Main paper (3 experiments)")
     manifest_lines.append("- E1 (synthetic): `main/tables/e1_synth.tex`")
     manifest_lines.append(
-        "- E2 (CSIC HTTP): `main/tables/e2_csic_token_fair.tex`, `main/tables/e2_csic_convergence.tex` + `main/figures/e2_csic_token_fair_learning_curves_tiny.pdf`"
+        "- E2 (CSIC HTTP): `main/tables/e2_csic_token_fair.tex`; optional convergence table `main/tables/e2_csic_convergence.tex`; scaling/frontier figures in `main/figures/e2_csic_*.pdf`"
     )
     manifest_lines.append(
-        "- E3 (Pareto slice): `main/tables/e3_pareto.tex` + `main/figures/e3_pareto_triptych.pdf` (and per-metric `e3_pareto_*.pdf`)"
+        "- E3 (Pareto slice): `main/tables/e3_pareto.tex` + `main/figures/e3_pareto_triptych.pdf`; optional scaling figure `main/figures/e3_budget_scaling.pdf`"
     )
     manifest_lines.append("")
     manifest_lines.append("## Appendix")

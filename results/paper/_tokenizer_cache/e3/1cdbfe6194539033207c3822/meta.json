@@ -1,0 +1,22 @@
+{
+  "key": "1cdbfe6194539033207c3822",
+  "meta": {
+    "schema": "e3_tokenizers_v1",
+    "dataset": "openml_adult",
+    "vocab": 2048,
+    "seed": 0,
+    "cit_contract": {
+      "min_id_len": 12,
+      "min_num_len": 6
+    },
+    "cit_cfg": {
+      "vocab_size": 2048,
+      "seed": 0,
+      "mode": "fast",
+      "apply_contract_text": true,
+      "enforce_equals_boundary": true
+    },
+    "texts_hash": "df8528523c06cc84f52f4c99d21e8448386fba1848b0f989a3260f30dac2b3f5",
+    "labels_hash": "781b7e38a6a6d178cae185cf39090b2d437e73c30cd11e050a35c7f3aa96e25e"
+  }
+}

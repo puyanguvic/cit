@@ -118,7 +118,7 @@ All experiment outputs are written under the top-level `results/` folder.
 
 ## One-click paper runs
 
-All scripts write outputs under `results/`. The default one-click runner runs the main-paper E1/E2/E3 and will auto-download CSIC 2010 if missing.
+All scripts write outputs under `results/`. The default one-click runner now runs the full suite (main-paper + appendix + budget sweeps), and will auto-download CSIC 2010 if missing.
 
 ```bash
 python scripts/run_all.py --device cuda --seed 0
@@ -128,10 +128,22 @@ This will populate:
 - `results/paper/e1/seed0/...`
 - `results/paper/e2/seed0/...`
 - `results/paper/e3/seed0/...`
+- `results/paper/appendix_e1/seed0/...`
+- `results/paper/appendix_e2/seed0/...`
+- `results/paper/appendix_e3/...`
+- `results/paper/appendix_e4/seed0/...`
+- `results/paper/e2_budget_sweep/...`
+- `results/paper/e3_budget_sweep/...`
 and export paper-ready artifacts under:
 - `results/paper/paper_artifacts/` (see `results/paper/paper_artifacts/MANIFEST.md`)
 and (by default) sync the figures referenced by `paper.tex`/`appendix.tex` into:
 - `Figs/`
+
+If you only want the main-paper E1/E2/E3 runs:
+
+```bash
+python scripts/run_all.py --device cuda --seed 0 --only e1,e2,e3
+```
 
 If you re-run experiments and want to refresh just the paper-ready PDFs + `Figs/` to match the current LaTeX references:
 

@@ -1,0 +1,26 @@
+{
+  "key": "920ebfc71a034ed9aea6ead0",
+  "meta": {
+    "schema": "e2_tokenizers_v1",
+    "dataset": "csic2010_http",
+    "vocab": 2048,
+    "seed": 0,
+    "include_raw": false,
+    "n_train": 20000,
+    "n_val": 5000,
+    "n_test": 5000,
+    "cit_contract": {
+      "min_id_len": 12,
+      "min_num_len": 6
+    },
+    "cit_cfg": {
+      "vocab_size": 2048,
+      "seed": 0,
+      "mode": "fast",
+      "apply_contract_text": true,
+      "enforce_equals_boundary": true
+    },
+    "texts_hash": "781b5597200e178d0d848e486fced921677b8635d642e19a01ef64db1b0e96d0",
+    "labels_hash": "bf7690983a0109f20623ea604ced7d3f7860eb5fe28cde79c7d7ef1630a0608c"
+  }
+}

@@ -1,0 +1,3 @@
+{"step": -1, "vocab_size": 15, "base_rate": 539.645, "base_dist": 0.33070261338985396}
+{"step": 50, "token": "SC_EQ", "vocab_size": 51, "rate": 538.9, "dist": 0.49491585123194587, "score": 2240.0, "mode": "fast"}
+{"step": 100, "token": ">0", "vocab_size": 101, "rate": 503.035, "dist": 0.343724362678401, "score": 223.0, "mode": "fast"}

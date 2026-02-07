@@ -21,7 +21,7 @@
     "dist_samples": 2000
   },
   "env": {
-    "timestamp_utc": "2026-01-29T07:32:01Z",
+    "timestamp_utc": "2026-02-06T22:05:31Z",
     "python": "3.13.7 (main, Sep 18 2025, 19:47:49) [Clang 20.1.4 ]",
     "platform": "Linux-6.8.0-87-generic-x86_64-with-glibc2.39",
     "cwd": "/home/cnlab-pu/Projects/cit",
@@ -32,7 +32,7 @@
     "cuda_device_0": "NVIDIA GeForce RTX 4090",
     "git": {
       "root": "/home/cnlab-pu/Projects/cit",
-      "sha": "532575bad1c899bd21d5e48ecc380675f2f96e44",
+      "sha": "7ba42da590803595cd697d1fae3136e71a9cdac8",
       "dirty": true
     }
   }

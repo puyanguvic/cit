@@ -1,7 +1,6 @@
 import argparse
 import csv
 from pathlib import Path
-import json
 import sys
 
 from tqdm import tqdm
@@ -52,15 +51,46 @@ def _token_label_purity(token_seqs, labels, min_count: int = 20, topk: int = 50)
     rows.sort(key=lambda r: (r["purity"], r["count"]), reverse=True)
     return rows[:topk]
 
+
 def hf_encode(tok, texts):
     return [tok.encode(t).ids for t in texts]
+
 
 def _encode_utf8_bytes_single(s: str) -> list[int]:
     # Reserve 0 for pad_id in the encoder; keep byte ids in [1,256].
     return [b + 1 for b in s.encode("utf-8", errors="replace")]
 
+
 def encode_utf8_bytes(texts: list[str]) -> list[list[int]]:
     return [_encode_utf8_bytes_single(t) for t in texts]
+
+
+def _parse_cit_variants(raw: str) -> list[str]:
+    out: list[str] = []
+    alias = {
+        "full": "full",
+        "cit": "full",
+        "no_typed": "no_typed",
+        "no-typed": "no_typed",
+        "notyped": "no_typed",
+        "no_contract": "no_contract",
+        "no-contract": "no_contract",
+        "nocontract": "no_contract",
+    }
+    for part in raw.split(","):
+        key = alias.get(part.strip().lower())
+        if key and key not in out:
+            out.append(key)
+    return out
+
+
+def _make_cit_prefix_encoder(vocab: dict[str, int], contract: Contract, apply_contract_text: bool):
+    def _enc(s: str) -> list[int]:
+        x = apply_contract(s, contract) if apply_contract_text else s
+        return tokenize_longest_match(x, vocab)
+
+    return _enc
+
 
 def main():
     ap = argparse.ArgumentParser()
@@ -77,6 +107,12 @@ def main():
         type=int,
         default=200,
         help="Number of test examples to sample for drift evaluation (each expanded into multiple variants).",
+    )
+    ap.add_argument(
+        "--cit-variants",
+        type=str,
+        default="full,no_typed,no_contract",
+        help="Comma-separated CIT variants: full,no_typed,no_contract",
     )
     args = ap.parse_args()
 
@@ -98,32 +134,75 @@ def main():
 
     # baselines
     bpe = train_bpe(Xtr, vocab_size=args.vocab)
-    wp  = train_wordpiece(Xtr, vocab_size=args.vocab)
+    wp = train_wordpiece(Xtr, vocab_size=args.vocab)
     uni = train_unigram(Xtr, vocab_size=args.vocab)
 
-    # CIT
     tok_dir = outdir / "tokenizers"
-    (tok_dir / "cit").mkdir(parents=True, exist_ok=True)
-    contract = Contract(min_id_len=12, min_num_len=6)
-    cit_art, cit_contract = train_cit(
-        Xtr,
-        ytr,
-        contract,
-        InductionCfg(vocab_size=args.vocab, lambda_dist=1.0, seed=args.seed),
-        log_path=str(outdir / "tokenizers" / "cit" / "induction_log.jsonl"),
-    )
-
-    # save tokenizer artifacts
     tok_dir.mkdir(parents=True, exist_ok=True)
+
+    # CIT full + ablations
+    cit_variants = _parse_cit_variants(args.cit_variants)
+    if not cit_variants:
+        raise ValueError("Empty --cit-variants list")
+    cit_specs = {
+        "full": {
+            "name": "CIT",
+            "artifact_dir": "cit",
+            "contract": Contract(min_id_len=12, min_num_len=6),
+            "apply_contract_text": True,
+            "enforce_equals_boundary": True,
+        },
+        "no_typed": {
+            "name": "CIT_no_typed",
+            "artifact_dir": "cit_no_typed",
+            "contract": Contract(min_id_len=10**9, min_num_len=10**9),
+            "apply_contract_text": True,
+            "enforce_equals_boundary": True,
+        },
+        "no_contract": {
+            "name": "CIT_no_contract",
+            "artifact_dir": "cit_no_contract",
+            "contract": Contract(min_id_len=10**9, min_num_len=10**9),
+            "apply_contract_text": False,
+            "enforce_equals_boundary": False,
+        },
+    }
+    cit_entries = []
+    for variant in cit_variants:
+        spec = cit_specs[variant]
+        variant_dir = tok_dir / spec["artifact_dir"]
+        variant_dir.mkdir(parents=True, exist_ok=True)
+        cit_vocab, cit_contract = train_cit(
+            Xtr,
+            ytr,
+            spec["contract"],
+            InductionCfg(
+                vocab_size=args.vocab,
+                lambda_dist=1.0,
+                seed=args.seed,
+                apply_contract_text=bool(spec["apply_contract_text"]),
+                enforce_equals_boundary=bool(spec["enforce_equals_boundary"]),
+            ),
+            log_path=str(variant_dir / "induction_log.jsonl"),
+        )
+        save_vocab_json(cit_vocab, variant_dir / "vocab.json")
+        save_json(cit_contract, variant_dir / "contract.json")
+        cit_entries.append(
+            {
+                "name": str(spec["name"]),
+                "vocab": cit_vocab,
+                "contract": cit_contract,
+                "apply_contract_text": bool(spec["apply_contract_text"]),
+            }
+        )
+
+    # save baseline tokenizer artifacts
     (tok_dir / "bpe").mkdir(parents=True, exist_ok=True)
     (tok_dir / "wordpiece").mkdir(parents=True, exist_ok=True)
     (tok_dir / "unigram").mkdir(parents=True, exist_ok=True)
-    (tok_dir / "cit").mkdir(parents=True, exist_ok=True)
     bpe.save(str(tok_dir / "bpe" / "tokenizer.json"))
     wp.save(str(tok_dir / "wordpiece" / "tokenizer.json"))
     uni.save(str(tok_dir / "unigram" / "tokenizer.json"))
-    save_vocab_json(cit_art, tok_dir / "cit" / "vocab.json")
-    save_json(cit_contract, tok_dir / "cit" / "contract.json")
 
     # interface metrics (rate + surrogate distortion + oracle prefix predictability)
     #
@@ -140,19 +219,51 @@ def main():
     runs = []
     audit_dir = outdir / "audit"
     audit_dir.mkdir(parents=True, exist_ok=True)
-    tokenizer_list = [
-        ("BPE", lambda t: hf_encode(bpe, t)),
-        ("WordPiece", lambda t: hf_encode(wp, t)),
-        ("Unigram", lambda t: hf_encode(uni, t)),
-        ("Bytes", encode_utf8_bytes),
-        ("CIT", lambda t: [tokenize_longest_match(apply_contract(s, cit_contract), cit_art) for s in t]),
+
+    tokenizer_specs = [
+        {
+            "name": "BPE",
+            "encode_batch": lambda t: hf_encode(bpe, t),
+            "encode_prefix": lambda s, _tok=bpe: _tok.encode(s).ids,
+        },
+        {
+            "name": "WordPiece",
+            "encode_batch": lambda t: hf_encode(wp, t),
+            "encode_prefix": lambda s, _tok=wp: _tok.encode(s).ids,
+        },
+        {
+            "name": "Unigram",
+            "encode_batch": lambda t: hf_encode(uni, t),
+            "encode_prefix": lambda s, _tok=uni: _tok.encode(s).ids,
+        },
+        {
+            "name": "Bytes",
+            "encode_batch": encode_utf8_bytes,
+            "encode_prefix": _encode_utf8_bytes_single,
+        },
     ]
-    for name, enc in tqdm(
-        tokenizer_list,
+    for entry in cit_entries:
+        enc_pref = _make_cit_prefix_encoder(
+            entry["vocab"], entry["contract"], bool(entry["apply_contract_text"])
+        )
+        tokenizer_specs.append(
+            {
+                "name": entry["name"],
+                "encode_batch": lambda t, _f=enc_pref: [_f(x) for x in t],
+                "encode_prefix": enc_pref,
+            }
+        )
+
+    for spec in tqdm(
+        tokenizer_specs,
         desc="tokenizers",
         leave=True,
         disable=not sys.stderr.isatty(),
     ):
+        name = spec["name"]
+        enc = spec["encode_batch"]
+        enc_pref = spec["encode_prefix"]
+
         tr_ids = enc(Xtr)
         te_ids = enc(Xte)
         purity = _token_label_purity(tr_ids, ytr, min_count=20, topk=50)
@@ -160,11 +271,12 @@ def main():
             w = csv.DictWriter(f, fieldnames=["token_id", "count", "best_label", "purity"])
             w.writeheader()
             w.writerows(purity)
+
         pad_id = 0
         max_len = int(args.max_len)
         total_tokens = int(args.total_tokens)  # match
         train_ds = list(zip(tr_ids, ytr))
-        test_ds  = list(zip(te_ids, yte))
+        test_ds = list(zip(te_ids, yte))
         model = TinyEncoder(vocab_size=args.vocab, n_classes=n_classes)
         model = train_compute_matched(
             model,
@@ -179,15 +291,6 @@ def main():
         acc = evaluate(model, test_ds, pad_id, max_len, device=args.device)
 
         rate = estimate_rate(te_ids)
-        # distortion: use the same encoder function applied to *raw prefixes*
-        if name == "CIT":
-            enc_pref = lambda s: tokenize_longest_match(apply_contract(s, cit_contract), cit_art)
-        elif name == "Bytes":
-            enc_pref = _encode_utf8_bytes_single
-        else:
-            # tokenizers.Tokenizer encodes full string; for prefixes we just encode prefix strings.
-            base_tok = {"BPE": bpe, "WordPiece": wp, "Unigram": uni}[name]
-            enc_pref = lambda s, _tok=base_tok: _tok.encode(s).ids
         dist = estimate_surrogate_distortion(Xtr, ytr, encode_prefix=enc_pref, vocab_size=args.vocab, cfg=dcfg)
         oracle_acc = estimate_prefix_oracle_accuracy_split(
             Xtr,
@@ -212,7 +315,7 @@ def main():
             drift_texts.extend(vs)
             drift_labels.extend([yte[i]] * len(vs))
             v_ids = enc(vs)
-            v_ds = list(zip(v_ids, [yte[i]]*len(vs)))
+            v_ds = list(zip(v_ids, [yte[i]] * len(vs)))
             drift_accs.append(evaluate(model, v_ds, pad_id, max_len, device=args.device))
         drift_acc = sum(drift_accs) / len(drift_accs)
         oracle_drift_acc = estimate_prefix_oracle_accuracy_split(
@@ -223,6 +326,7 @@ def main():
             encode_prefix=enc_pref,
             cfg=dcfg,
         )
+
         runs.append(
             {
                 "tokenizer": name,
@@ -244,6 +348,7 @@ def main():
         w.writeheader()
         w.writerows(runs)
     print(f"[wrote] {outdir / 'results.csv'}")
+
 
 if __name__ == "__main__":
     main()

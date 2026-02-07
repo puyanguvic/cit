@@ -17,7 +17,7 @@
       "p95_len": 687,
       "p99_len": 803,
       "trunc_rate_at_max_len": 0.2942,
-      "tokenize_ms_per_sample": 0.33457459341734647
+      "tokenize_ms_per_sample": 0.21875029001384974
     },
     {
       "dataset": "csic2010",
@@ -36,7 +36,7 @@
       "p95_len": 620,
       "p99_len": 723,
       "trunc_rate_at_max_len": 0.2516,
-      "tokenize_ms_per_sample": 0.18227361962199212
+      "tokenize_ms_per_sample": 0.19167092218995094
     },
     {
       "dataset": "csic2010",
@@ -55,7 +55,7 @@
       "p95_len": 620,
       "p99_len": 723,
       "trunc_rate_at_max_len": 0.2514,
-      "tokenize_ms_per_sample": 0.20309463944286107
+      "tokenize_ms_per_sample": 0.1933099389076233
     },
     {
       "dataset": "csic2010",
@@ -74,7 +74,7 @@
       "p95_len": 547,
       "p99_len": 639,
       "trunc_rate_at_max_len": 0.0734,
-      "tokenize_ms_per_sample": 0.20324931126087903
+      "tokenize_ms_per_sample": 0.2055667269974947
     },
     {
       "dataset": "csic2010",
@@ -93,7 +93,7 @@
       "p95_len": 547,
       "p99_len": 639,
       "trunc_rate_at_max_len": 0.0734,
-      "tokenize_ms_per_sample": 0.20114533584564925
+      "tokenize_ms_per_sample": 0.2056144170463085
     },
     {
       "dataset": "csic2010",
@@ -112,7 +112,7 @@
       "p95_len": 563,
       "p99_len": 663,
       "trunc_rate_at_max_len": 0.098,
-      "tokenize_ms_per_sample": 0.1647548893466592
+      "tokenize_ms_per_sample": 0.14586754459887744
     }
   ],
   "errors": {}

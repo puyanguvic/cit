@@ -1,0 +1,7 @@
+{"step": -1, "vocab_size": 8, "base_rate": 933.228, "base_dist": 0.32432646670793713}
+{"step": 50, "token": "E", "vocab_size": 51, "rate": 935.448, "dist": 0.9950815068270283, "score": 105.0, "mode": "fast"}
+{"step": 100, "token": "al", "vocab_size": 101, "rate": 898.169, "dist": 2.2694018459538228, "score": 9.0, "mode": "fast"}
+{"step": 150, "token": "nal=S", "vocab_size": 151, "rate": 882.266, "dist": 2.379737260825127, "score": 32.0, "mode": "fast"}
+{"step": 200, "token": "hE", "vocab_size": 201, "rate": 866.757, "dist": 2.332456869420601, "score": 6.0, "mode": "fast"}
+{"step": 250, "token": "3S", "vocab_size": 251, "rate": 859.707, "dist": 2.1460870687020495, "score": 5.0, "mode": "fast"}
+{"step": 300, "token": "wQ", "vocab_size": 301, "rate": 852.487, "dist": 1.8801153205066174, "score": 5.0, "mode": "fast"}
