@@ -57,6 +57,7 @@ Our contributions are:
 
 
 The remainder of the paper develops the interface formulation, presents CIT, and evaluates its efficiency, robustness, and end-to-end impact under strict drop-in constraints.
+Additional proofs, vocabulary-budget sweep results, and extra context are provided in the supplementary appendix.
 
 
 \section{Problem Formulation}
@@ -345,7 +346,7 @@ We report results on (i) a synthetic structured prefix task designed to stress r
 (ii) CSIC 2010 HTTP anomaly detection (public, structured, and drift-prone),
 and (iii) OpenML Adult for an end-to-end accuracy/latency Pareto slice.
 We additionally report Credit-G (German Credit) in E4~\cite{adult_2,statlog_german_credit_data_144}.
-(Vocabulary-budget sweeps are deferred to the appendix.)
+(Vocabulary-budget sweeps and additional details are deferred to the supplementary appendix.)
 
 \paragraph{Tokenizers.}
 We use three baseline classes to make the comparison both controlled and practically relevant.
@@ -471,9 +472,24 @@ E0 and E4 provide complementary evidence on off-the-shelf interface cost and add
 \section{Discussion}
 \label{sec:discussion}
 
-Our results support the view that tokenization for domain-specific prediction should prioritize specialization over generality.
-On structured inputs, frequency-driven compression alone is insufficient and can actively harm task performance by conflating semantic roles.
-CIT demonstrates that enforcing interface constraints and aligning vocabulary induction with task semantics yields more efficient and robust representations, particularly for small encoder-only models.
+\paragraph{What changes when tokenization is an interface.}
+The main takeaway is that tokenization is not only a compression heuristic: under a strict drop-in regime it is a \emph{hard interface} that determines which prefix distinctions are even observable to the model.
+For structured streams, interface errors are often causal and irreversible (prefix semantic collapse), so improving the interface can be more effective than increasing model size or training compute under the same constraints.
+
+\paragraph{When CIT helps (and why).}
+CIT is most appropriate when (i) semantics is role- and boundary-dependent (e.g., key/value and delimiter structure), (ii) high-cardinality values are frequent and span integrity matters, and (iii) deployment budgets make truncation and length tails a first-order concern.
+In these settings, frequency-driven subword merges can trade away role cues for compression, while byte-level interfaces preserve everything but waste rate.
+CIT targets the middle ground: it enforces role and typed-value constraints to prevent collapse, then uses deployment-aligned gain to recover efficiency.
+
+\paragraph{Limitations and failure modes.}
+CIT requires an explicit contract; if the contract is underspecified (missing boundaries) or overspecified (forbidding useful merges), performance can degrade.
+Typed-value integrity is also a modeling choice: if predictive signal genuinely lies \emph{inside} value strings (e.g., identifier prefixes or checksums that correlate with labels), treating them as atomic can hide useful structure.
+Finally, our directed semantic distortion is an evaluation tool; while it is designed to reflect interface-induced loss, any practical surrogate depends on the chosen teacher/student capacity and the data distribution.
+
+\paragraph{Practical guidance.}
+In deployments, the highest-leverage step is to define the serialization and contract as a versioned artifact alongside the model, and to audit it under realistic drift operators (e.g., benign re-serializations) before vocabulary induction.
+When contract design is unclear, a conservative workflow is to start with minimal hard constraints (obvious boundaries and typed spans), measure rate--distortion operating points, and iterate only where the interface demonstrably collapses semantics.
+We include additional controls, proofs, and vocabulary-budget sweeps in the supplementary appendix to support this workflow.
 
 
 \section{Conclusion}
