@@ -1,3 +1,0 @@
-dataset,model,tokenizer,budget_mode,acc,drift_acc,avg_len,p95_len,vocab,max_len,total_tokens,total_steps,majority_train_frac,majority_test_acc,seed
-csic2010,small,CIT,step_fair,0.9132,0.9132,216.9894,416,2048,512,10000000,959,0.54165,0.5576,0
-csic2010,small,WordPiece,step_fair,0.9276,0.4976,329.4426,526,2048,512,10000000,959,0.54165,0.5576,0

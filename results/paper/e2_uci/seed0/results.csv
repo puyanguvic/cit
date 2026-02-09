@@ -1,5 +1,0 @@
-dataset,tokenizer,acc,majority_acc,avg_len,p95_len,distortion_hat,vocab,max_len,total_tokens,seed,probe_only
-credit-g,BPE,0.705,0.7,141.755,151,0.09704186798765135,2048,256,2000000,0,False
-credit-g,WordPiece,0.685,0.7,141.685,150,0.10014936631063502,2048,256,2000000,0,False
-credit-g,Unigram,0.7,0.7,321.39,339,0.1696545982392872,2048,256,2000000,0,False
-credit-g,CIT,0.685,0.7,99.09,113,0.07978479950830827,2048,256,2000000,0,False
