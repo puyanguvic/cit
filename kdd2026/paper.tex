@@ -14,13 +14,15 @@ Collapse is an interface property: once it happens, no downstream encoder operat
 This is especially damaging for streaming or early-decision settings and for any deployment with hard maximum sequence lengths.
 
 Canonical tokenizers fail on structured inputs in a structural way.
-WordPiece and BPE optimize subword statistics largely driven by natural language, without constraints that respect role boundaries or typed value spans.
+WordPiece~\cite{schuster2012japanese,wu2016gnmt} and BPE~\cite{gage1994new,sennrich2016neural} optimize subword statistics largely driven by natural language, without constraints that respect role boundaries or typed value spans.
 As a result, they may segment across boundary-bearing symbols, entangle role cues with incidental value fragments, and become brittle to semantics-preserving re-serialization (e.g., benign field reordering, whitespace/escaping normalization).
 Conversely, using finer-grained pieces to avoid brittleness often leads to heavy-tailed token lengths on high-cardinality fields, inflating attention cost and truncation risk.
+These effects are consistent with broader evidence that tokenizer choice and granularity can materially affect downstream behavior and robustness~\cite{rust2021good,bostrom2020byte,mielke2021between}.
 
 These interface effects appear immediately under standard encoder limits.
 In a scan of six widely used pretrained tokenizers on 5{,}000 CSIC 2010 HTTP requests~\cite{torrano2010csic} with $L_{\max}{=}512$, average sequence lengths range from 359--468 tokens and 7--29\% of examples exceed the limit (29.4\% for BERT WordPiece; 7.3\% for a GPT-3.5/GPT-4-family tokenizer; Table~\ref{tab:e0_tokenizer_playground}).
 The tail is heavy: the longest request reaches 1{,}034 tokens, illustrating that truncation risk is an interface property of segmentation rather than a modeling detail.
+Many widely deployed GPT-family tokenizers are also BPE-derived and inherit similar interface trade-offs~\cite{radford2019language,brown2020language}.
 
 % \begin{figure}[t]
 % \centering
@@ -105,6 +107,7 @@ P^\star(\,\cdot \mid X_{1:t}),
 \end{equation}
 which captures the strongest achievable semantics given direct access to the raw prefix.
 This definition abstracts away nuisance variation and retains exactly the information relevant for prediction under the chosen loss~\cite{cover1999elements,tishby2000information}.
+We use this notion only as a conceptual reference point; related operationalizations appear in information bottleneck objectives for deep predictors~\cite{alemi2016deep}.
 
 Tokenization restricts access to the raw input by exposing only the tokenized prefix $Z^{(t)}$.
 Fix a reference predictor family $\mathcal{Q}$ whose members map tokenized prefixes to predictive distributions over $Y$.
@@ -201,6 +204,7 @@ The resulting \emph{rate--semantic distortion frontier}
 characterizes the fundamental trade-off imposed by the interface under a fixed vocabulary budget.
 Lowering $R(\tau)$ increases usable context and reduces compute, while excessive compression necessarily increases $\Delta(\tau)$ by collapsing task-relevant distinctions at the prefix level.
 This mirrors classical rate--distortion trade-offs in lossy compression~\cite{shannon1948mathematical,cover1999elements}, with the crucial difference that distortion here is task-aligned and prefix-sensitive rather than reconstruction-based.
+It also connects to description-length views of learning and compression~\cite{rissanen1978modeling}.
 
 Rather than treating tokenization as a heuristic preprocessing choice, we view interface design as selecting an operating point on $\mathcal{F}(B)$.
 The next section develops a deployment-aligned method for constructing tokenizers that improve this trade-off under deterministic, prefix-emitting execution semantics.
@@ -314,7 +318,9 @@ X \;=\; s(r) \in \Sigma^\ast,
 \end{equation}
 where $\Sigma$ is an alphabet of characters or bytes.
 This record-to-text practice is widely adopted to reuse sequence models for non-linguistic inputs, including
-tabular and semi-structured prediction pipelines~\cite{yin2020tabert,herzig2020tapas}.
+tabular and semi-structured prediction pipelines~\cite{yin2020tabert,herzig2020tapas,wang2021tuta,deng2022turl}.
+Structured prediction on databases and tables is also commonly studied via semantic parsing and text-to-SQL benchmarks~\cite{zhong2017seq2sql,yu2018spider}.
+Complementary work explores specialized deep architectures for tabular prediction that do not rely on record-to-text serialization~\cite{huang2020tabtransformer,gorishniy2021revisiting}.
 
 A tokenizer is a mapping $\tau : \Sigma^\ast \rightarrow \mathcal{V}^\ast$ over a finite vocabulary
 $\mathcal{V}$, producing a token sequence $Z = \tau(X)$.
@@ -334,9 +340,9 @@ This requirement models streaming and early-decision settings, and it induces a 
 raw input stream and the model's available observations at inference time.
 
 In encoder-only Transformers, inference cost scales at least linearly—and often superlinearly—with token
-sequence length due to self-attention~\cite{vaswani2017attention,kaplan2020scaling}.
+sequence length due to self-attention~\cite{vaswani2017attention,kaplan2020scaling,zhai2022scaling}.
 Efficient long-sequence Transformer variants exist (e.g., sparse attention), but they are not drop-in replacements
-in our strict interface setting~\cite{beltagy2020longformer,zaheer2020bigbird}.
+in our strict interface setting~\cite{beltagy2020longformer,zaheer2020bigbird,guo2019star}.
 Consequently, under small-model and low-latency constraints, tokenization directly controls effective context
 length, truncation behavior, and compute allocation.
 This makes the tokenization interface a first-order bottleneck for both efficiency and accuracy in structured
@@ -670,6 +676,7 @@ Then, under the convention that the procedure may perform a no-op update when al
 Proposition~\ref{prop:greedy_descent} establishes that the greedy selection rule used by CIT performs a
 consistent local descent on the deployment-aligned objective.
 While global optimality is not guaranteed due to non-submodularity and interaction effects between tokens,
+in contrast to classical approximation guarantees available for greedy maximization of submodular objectives~\cite{nemhauser1978analysis},
 this property distinguishes CIT from frequency-driven heuristics that lack an explicit interface-level
 objective.
 
@@ -693,13 +700,15 @@ serialized into symbolic strings using a fixed schema shared across all tokenize
 We report results on (i) a synthetic structured prefix task designed to stress role/boundary dependence and semantics-preserving drift,
 (ii) CSIC 2010 HTTP anomaly detection (public, structured, and drift-prone),
 and (iii) OpenML Adult for an end-to-end accuracy/latency Pareto slice.
+We additionally report Credit-G (German Credit) in E4~\cite{adult_2,statlog_german_credit_data_144}.
 (Vocabulary-budget sweeps are deferred to the appendix.)
 
 \paragraph{Tokenizers.}
 We use three baseline classes to make the comparison both controlled and practically relevant.
-\emph{Budget-matched learned tokenizers} (BPE~\cite{sennrich2016neural}, WordPiece~\cite{schuster2012japanese,wu2016gnmt}, Unigram~\cite{kudo2018subword}) are trained on the task's training serialization and constrained to a fixed vocabulary budget ($|\mathcal{V}|{=}2048$), matching CIT.
+\emph{Budget-matched learned tokenizers} (BPE~\cite{gage1994new,sennrich2016neural}, WordPiece~\cite{schuster2012japanese,wu2016gnmt}, Unigram~\cite{kudo2018subword,kudo2018sentencepiece}) are trained on the task's training serialization and constrained to a fixed vocabulary budget ($|\mathcal{V}|{=}2048$), matching CIT.
+Regularized training variants for subword tokenizers exist (e.g., BPE-dropout), but we keep baseline induction simple to isolate interface effects~\cite{provilkov2020bpe}.
 \emph{A lossless byte-level tokenizer} (\textsc{Bytes}, UTF-8 bytes) serves as a high-fidelity interface baseline that preserves raw information but incurs a high rate; it helps separate semantic fidelity from compression.
-\emph{Tokenization-free and byte/character-level encoders} provide alternative interfaces but change the modeling stack and are not in our drop-in regime~\cite{xue2022byt5,clark2022canine,yu2023megabyte}.
+\emph{Tokenization-free and byte/character-level encoders} provide alternative interfaces but change the modeling stack and are not in our drop-in regime~\cite{xue2022byt5,clark2022canine,tay2021charformer,yu2023megabyte}.
 \emph{Off-the-shelf pretrained tokenizers} (e.g., popular BERT/GPT-family tokenizers) are not budget-matched and are trained on different distributions; we therefore report them only as a tokenizer-only interface scan (E0) rather than mixing them into compute-matched end-to-end training.
 All tokenizers are deterministic and prefix-emitting.
 
