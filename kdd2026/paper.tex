@@ -723,7 +723,7 @@ and, where applicable, parameter count and end-to-end inference latency (95th pe
 E0 reports a tokenizer-only scan that quantifies interface cost under common pretrained tokenizers on CSIC 2010 at $L_{\max}{=}512$ (Table~\ref{tab:e0_tokenizer_playground}).
 \paragraph{Takeaway.}
 Off-the-shelf natural-language tokenizers induce heavy token-length tails and non-trivial truncation (up to 29.4\%), motivating budget-matched, contract-aware interfaces for structured streams.
-\input{results/paper/paper_artifacts/main/tables/e0_tokenizer_playground.tex}
+\input{Tables/e0_tokenizer_playground.tex}
 
 \subsection{E1: Does CIT Prevent Prefix Semantic Collapse?}
 \label{sec:exp_e1}
@@ -737,7 +737,7 @@ Table~\ref{tab:e1_synth} shows that BPE/WordPiece/Unigram achieve only $\approx$
 Crucially, CIT attains this while using far fewer tokens on average (81 vs.\ 645--692 for learned subword baselines and 1{,}058 for bytes) and with substantially lower surrogate distortion, consistent with preventing interface-induced collapse rather than trading fidelity for compression.
 
 Results are summarized in Table~\ref{tab:e1_synth}.
-\input{results/paper/paper_artifacts/main/tables/e1_synth.tex}
+\input{Tables/e1_synth.tex}
 
 Two ablations collapse back to chance: disabling typed-value normalization (\textsc{CIT\_no\_typed}) or disabling the contract (\textsc{CIT\_no\_contract}) removes the interface constraints that prevent collapse.
 Together, these results support a causal interpretation: the gains come from interface correctness, not from incidental frequency effects of a different vocabulary.
@@ -754,7 +754,7 @@ This shifts the accuracy--length frontier and yields large robustness gains unde
 Compared to the lossless byte-level interface, CIT attains much higher accuracy and robustness at far lower rate by enforcing interface constraints rather than relying on lossless tokenization.
 
 Table~\ref{tab:e2_csic_controls} reports the token-fair results and the step-fair control side-by-side.
-\input{results/paper/paper_artifacts/main/tables/e2_csic_controls.tex}
+\input{Tables/e2_csic_controls.tex}
 
 Robustness reveals the interface effect most clearly: under drift, CIT retains its performance while standard subword baselines can suffer large drops.
 Unigram is comparatively robust but less token-efficient under the same budget.
@@ -779,7 +779,7 @@ The byte-level baseline provides a complementary operating point with lossless s
 Overall, CIT improves operating points on the accuracy--latency frontier while also reducing surrogate distortion, indicating that efficiency gains do not come from collapsing task-relevant prefix information.
 
 Results are summarized in Table~\ref{tab:e3_pareto} and Figure~\ref{fig:e3_pareto}.
-\input{results/paper/paper_artifacts/main/tables/e3_pareto.tex}
+\input{Tables/e3_pareto.tex}
 
 \begin{figure*}[t]
 \centering
@@ -803,7 +803,7 @@ We additionally run a token-budget sweep (1/2/5/10M tokens) to show how quickly 
 We additionally evaluate on two public tabular benchmarks (Adult and Credit-G) under the same drop-in constraints and token-fair training protocol (Table~\ref{tab:e4_uci}).
 \paragraph{Takeaway.}
 Across these datasets, CIT consistently reduces rate and surrogate distortion; accuracy is maintained on Adult but can be modestly lower on Credit-G, illustrating that efficiency gains do not guarantee uniform accuracy improvements on every task.
-\input{results/paper/paper_artifacts/main/tables/uci.tex}
+\input{Tables/uci.tex}
 
 \subsection{Summary}
 \label{sec:exp_summary}
