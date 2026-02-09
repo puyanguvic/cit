@@ -19,7 +19,7 @@ As a result, they may segment across boundary-bearing symbols, entangle role cue
 Conversely, using finer-grained pieces to avoid brittleness often leads to heavy-tailed token lengths on high-cardinality fields, inflating attention cost and truncation risk.
 
 These interface effects appear immediately under standard encoder limits.
-In a scan of six widely used pretrained tokenizers on 5{,}000 CSIC 2010 HTTP requests with $L_{\max}{=}512$, average sequence lengths range from 359--468 tokens and 7--29\% of examples exceed the limit (29.4\% for BERT WordPiece; 7.3\% for a GPT-3.5/GPT-4-family tokenizer; Table~\ref{tab:e0_tokenizer_playground}).
+In a scan of six widely used pretrained tokenizers on 5{,}000 CSIC 2010 HTTP requests~\cite{torrano2010csic} with $L_{\max}{=}512$, average sequence lengths range from 359--468 tokens and 7--29\% of examples exceed the limit (29.4\% for BERT WordPiece; 7.3\% for a GPT-3.5/GPT-4-family tokenizer; Table~\ref{tab:e0_tokenizer_playground}).
 The tail is heavy: the longest request reaches 1{,}034 tokens, illustrating that truncation risk is an interface property of segmentation rather than a modeling detail.
 
 % \begin{figure}[t]
@@ -66,7 +66,7 @@ Our goal is to characterize how interface design induces an irreversible compres
 \subsection{Setup and Drop-in Regime}
 \label{sec:setup}
 
-Each input example originates from a structured or semi-structured record $r \in \mathcal{R}$, such as a tabular row, a key--value map, or a protocol/log event.
+Each input example originates from a structured or semi-structured record $r \in \mathcal{R}$, such as a tabular row, a key--value map, or a protocol/log event~\cite{he2017drain,du2017deeplog}.
 To enable the use of encoder-only neural models, records are deterministically serialized into symbolic strings
 \begin{equation}
 X \;=\; s(r) \in \Sigma^\ast,
@@ -305,7 +305,7 @@ This compilation eliminates dynamic control flow, guarantees linear-time executi
 We study tokenization as a fixed representation interface for supervised prediction on structured and
 semi-structured symbolic inputs.
 Each example originates from a structured record $r \in \mathcal{R}$, such as a tabular row, a key--value map,
-or a protocol/log event.
+or a protocol/log event~\cite{he2017drain,du2017deeplog}.
 To enable the use of encoder-only neural encoders, records are deterministically serialized into symbolic
 strings
 \begin{equation}
@@ -335,6 +335,8 @@ raw input stream and the model's available observations at inference time.
 
 In encoder-only Transformers, inference cost scales at least linearly—and often superlinearly—with token
 sequence length due to self-attention~\cite{vaswani2017attention,kaplan2020scaling}.
+Efficient long-sequence Transformer variants exist (e.g., sparse attention), but they are not drop-in replacements
+in our strict interface setting~\cite{beltagy2020longformer,zaheer2020bigbird}.
 Consequently, under small-model and low-latency constraints, tokenization directly controls effective context
 length, truncation behavior, and compute allocation.
 This makes the tokenization interface a first-order bottleneck for both efficiency and accuracy in structured
@@ -695,8 +697,9 @@ and (iii) OpenML Adult for an end-to-end accuracy/latency Pareto slice.
 
 \paragraph{Tokenizers.}
 We use three baseline classes to make the comparison both controlled and practically relevant.
-\emph{Budget-matched learned tokenizers} (BPE~\cite{sennrich2016neural}, WordPiece~\cite{schuster2012japanese}, Unigram~\cite{kudo2018subword}) are trained on the task's training serialization and constrained to a fixed vocabulary budget ($|\mathcal{V}|{=}2048$), matching CIT.
+\emph{Budget-matched learned tokenizers} (BPE~\cite{sennrich2016neural}, WordPiece~\cite{schuster2012japanese,wu2016gnmt}, Unigram~\cite{kudo2018subword}) are trained on the task's training serialization and constrained to a fixed vocabulary budget ($|\mathcal{V}|{=}2048$), matching CIT.
 \emph{A lossless byte-level tokenizer} (\textsc{Bytes}, UTF-8 bytes) serves as a high-fidelity interface baseline that preserves raw information but incurs a high rate; it helps separate semantic fidelity from compression.
+\emph{Tokenization-free and byte/character-level encoders} provide alternative interfaces but change the modeling stack and are not in our drop-in regime~\cite{xue2022byt5,clark2022canine,yu2023megabyte}.
 \emph{Off-the-shelf pretrained tokenizers} (e.g., popular BERT/GPT-family tokenizers) are not budget-matched and are trained on different distributions; we therefore report them only as a tokenizer-only interface scan (E0) rather than mixing them into compute-matched end-to-end training.
 All tokenizers are deterministic and prefix-emitting.
 

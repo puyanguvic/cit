@@ -81,8 +81,7 @@
   journal={Transactions of the Association for Computational Linguistics},
   volume={10},
   pages={291--306},
-  year={2022},
-  publisher={MIT Press One Broadway, 12th Floor, Cambridge, Massachusetts 02142, USA~…}
+  year={2022}
 }
 
 @article{kaplan2020scaling,
@@ -118,7 +117,7 @@
   volume={18},
   number={4},
   pages={460--473},
-  year={2003},
+  year={1972},
   publisher={IEEE}
 }
 
@@ -166,7 +165,7 @@
 }
 
 @article{nemhauser1978analysis,
-  title={An analysis of approximations for maximizing submodular set functions—I},
+  title={An analysis of approximations for maximizing submodular set functions---I},
   author={Nemhauser, George L and Wolsey, Laurence A and Fisher, Marshall L},
   journal={Mathematical programming},
   volume={14},
@@ -242,22 +241,80 @@
   year={2021}
 }
 
-@inproceedings{rust2021good,
-  title={How good is your tokenizer? on the monolingual performance of multilingual language models},
-  author={Rust, Phillip and Pfeiffer, Jonas and Vuli{\'c}, Ivan and Ruder, Sebastian and Gurevych, Iryna},
-  booktitle={Proceedings of the 59th Annual Meeting of the Association for Computational Linguistics and the 11th International Joint Conference on Natural Language Processing (Volume 1: Long Papers)},
-  pages={3118--3135},
-  year={2021}
-}
-
 @article{clark2022canine,
   title={Canine: Pre-training an efficient tokenization-free encoder for language representation},
   author={Clark, Jonathan H and Garrette, Dan and Turc, Iulia and Wieting, John},
   journal={Transactions of the Association for Computational Linguistics},
   volume={10},
   pages={73--91},
-  year={2022},
-  publisher={MIT Press One Rogers Street, Cambridge, MA 02142-1209, USA journals-info~…}
+  year={2022}
+}
+
+% HTTP intrusion/anomaly datasets
+@misc{torrano2010csic,
+  title        = {{HTTP} {D}ataset {CSIC} 2010},
+  author       = {Carlos Torrano-Gim{\'e}nez and Antonio P{\'e}rez-Villegas and Gustavo {\'A}lvarez-Mara\~{n}on},
+  year         = {2010},
+  howpublished = {Information Security Institute (ISI), Spanish National Research Council (CSIC)},
+  url          = {https://www.isi.csic.es/dataset/},
+  note         = {Public dataset for HTTP traffic and web intrusion detection.}
+}
+
+% Tokenization for structured streams (WordPiece reference via GNMT)
+@article{wu2016gnmt,
+  title   = {Google's neural machine translation system: Bridging the gap between human and machine translation},
+  author  = {Wu, Yonghui and Schuster, Mike and Chen, Zhifeng and Le, Quoc V. and Norouzi, Mohammad and Macherey, Wolfgang and Krikun, Maxim and Cao, Yuan and Gao, Qin and Macherey, Klaus and others},
+  journal = {arXiv preprint arXiv:1609.08144},
+  doi     = {10.48550/arXiv.1609.08144},
+  year    = {2016}
+}
+
+% Long sequence processing (non-drop-in alternatives)
+@article{beltagy2020longformer,
+  title   = {Longformer: The long-document transformer},
+  author  = {Beltagy, Iz and Peters, Matthew E. and Cohan, Arman},
+  journal = {arXiv preprint arXiv:2004.05150},
+  doi     = {10.48550/arXiv.2004.05150},
+  year    = {2020}
+}
+
+@inproceedings{zaheer2020bigbird,
+  title     = {Big Bird: Transformers for longer sequences},
+  author    = {Zaheer, Manzil and Guruganesh, Guru and Dubey, Avinava and Ainslie, Joshua and Alberti, Chris and Onta{\~n}{\'o}n, Santiago and Pham, Philip and Ravula, Anirudh and Wang, Qifan and Yang, Li and Ahmed, Amr},
+  booktitle = {Advances in Neural Information Processing Systems},
+  volume    = {33},
+  pages     = {17283--17297},
+  url       = {https://proceedings.neurips.cc/paper_files/paper/2020/hash/c8512d142a2d849725f31a9a7a361ab9-Abstract.html},
+  year      = {2020}
+}
+
+% Tokenization-free / byte-level modeling
+@inproceedings{yu2023megabyte,
+  title     = {{MegaByte}: Predicting million-byte sequences with multiscale transformers},
+  author    = {Yu, Lili and Simig, David and Flaherty, Colin and Aharoni, Roee and Hashimoto, Tatsunori and others},
+  booktitle = {Advances in Neural Information Processing Systems},
+  url       = {https://proceedings.neurips.cc/paper_files/paper/2023/hash/4c8015536b6a87a19cb2d27162c35230-Abstract.html},
+  year      = {2023}
+}
+
+% Log parsing / anomaly detection (structured streams)
+@inproceedings{he2017drain,
+  title        = {Drain: An online log parsing approach with fixed depth tree},
+  author       = {He, Pinjia and Zhu, Jieming and He, Shilin and Li, Jian and Lyu, Michael R.},
+  booktitle    = {2017 {IEEE} International Conference on Web Services ({ICWS})},
+  pages        = {33--40},
+  year         = {2017},
+  doi          = {10.1109/ICWS.2017.13},
+  organization = {IEEE}
+}
+
+@inproceedings{du2017deeplog,
+  title     = {{DeepLog}: Anomaly detection and diagnosis from system logs through deep learning},
+  author    = {Du, Min and Li, Feifei and Zheng, Guineng and Srikumar, Vivek},
+  booktitle = {Proceedings of the 2017 {ACM} {SIGSAC} Conference on Computer and Communications Security},
+  pages     = {1285--1298},
+  year      = {2017},
+  doi       = {10.1145/3133956.3134015}
 }
 
 @article{tay2021charformer,
@@ -331,4 +388,3 @@
   journal={arXiv preprint arXiv:1809.08887},
   year={2018}
 }
-
