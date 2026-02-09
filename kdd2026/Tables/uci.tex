@@ -1,23 +1,24 @@
-% Copied from appendix artifacts to promote into main paper (table-only).
-% Original source: results/paper/paper_artifacts/appendix/tables/uci.tex
-% Requires: \usepackage{booktabs}
 \begin{table}[t]
 \centering
 \small
-\begin{tabular}{llrrrr}
+\setlength{\tabcolsep}{4pt}
+\begin{tabular*}{\columnwidth}{@{\extracolsep{\fill}}lcccc@{}}
 \toprule
-Dataset & Tokenizer & Acc. & avg\_len & p95\_len & Distortion $\hat{\Delta}$ \\
+Tokenizer & Acc. & Avg Len & P95 & Distortion $\hat{\Delta}$ \\
 \midrule
-adult & BPE & 0.839 & 106.3 & 111 & 0.206 \\
-adult & CIT & 0.842 & 60.5 & 69 & 0.138 \\
-adult & Unigram & 0.808 & 233.0 & 245 & 0.288 \\
-adult & WordPiece & 0.837 & 106.4 & 112 & 0.186 \\
-credit-g & BPE & 0.705 & 141.8 & 151 & 0.097 \\
-credit-g & CIT & 0.685 & 99.1 & 113 & 0.080 \\
-credit-g & Unigram & 0.705 & 321.4 & 339 & 0.170 \\
-credit-g & WordPiece & 0.670 & 141.7 & 150 & 0.100 \\
+\multicolumn{5}{l}{\textit{adult}}\\
+CIT        & \textbf{0.842} & \textbf{60.5} & \textbf{69}  & \textbf{0.138} \\
+WordPiece  & 0.837 & 106.4 & 112 & 0.186 \\
+BPE        & 0.839 & 106.3 & 111 & 0.206 \\
+Unigram    & 0.808 & 233.0 & 245 & 0.288 \\
+\midrule
+\multicolumn{5}{l}{\textit{credit-g}}\\
+CIT        & 0.685 & \textbf{99.1} & \textbf{113} & \textbf{0.080} \\
+BPE        & \textbf{0.705} & 141.8 & 151 & 0.097 \\
+Unigram    & \textbf{0.705} & 321.4 & 339 & 0.170 \\
+WordPiece  & 0.670 & 141.7 & 150 & 0.100 \\
 \bottomrule
-\end{tabular}
-\caption{E4: additional public tabular benchmarks (token-fair): accuracy, rate, and surrogate distortion.}
+\end{tabular*}
+\caption{Additional public tabular benchmarks under token-fair training. Across datasets, CIT consistently reduces sequence length and surrogate distortion, while maintaining comparable accuracy in most cases. These results indicate that the efficiency gains from CIT generalize beyond a single domain.}
 \label{tab:e4_uci}
 \end{table}
