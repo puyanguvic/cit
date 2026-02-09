@@ -1,8 +1,8 @@
 \begin{abstract}
-Tokenization serves as a fixed interface between raw symbolic inputs and neural encoders, yet most existing tokenizers are optimized for large language models and natural language distributions.
-When used as drop-in components in structured and semi-structured prediction pipelines, such tokenizers induce uncontrolled compression that distorts role-dependent semantics and wastes token budget under tight compute constraints.
-We formalize tokenization as a constrained interface design problem and introduce \emph{directed semantic distortion}, a prefix-aligned measure of irrecoverable task-relevant information loss induced by the interface.
-Based on this formulation, we propose \textbf{Controlled Interface Tokenization (CIT)}, which enforces a versioned interface contract with role-explicit boundaries and typed-value integrity, and constructs task-specialized vocabularies by maximizing compression efficiency within the contract under deterministic execution.
-Directed semantic distortion is used to evaluate and calibrate semantic fidelity across tokenizers and budgets, yielding empirical rate--distortion frontiers.
-Across synthetic and public structured classification tasks, CIT achieves superior rate--distortion trade-offs, higher accuracy under matched token budgets, and improved robustness to semantics-preserving re-serialization and prefix-limited prediction.
+Tokenization is a fixed interface between raw symbolic inputs and neural predictors, yet most tokenizers are optimized for natural language.
+In structured and semi-structured pipelines, this mismatch can fragment boundary-bearing symbols and high-cardinality values, wasting token budget and inducing irreversible prefix information loss.
+We formalize this failure mode as \emph{prefix semantic collapse} and introduce \emph{directed semantic distortion}, a prefix-aligned measure of interface-induced excess risk.
+Based on this formulation, we propose \textbf{Controlled Interface Tokenization (CIT)}, which enforces a versioned contract with role-explicit boundaries and typed-value integrity and induces vocabularies by maximizing deployment-aligned compression gain under deterministic, prefix-emitting execution.
+On CSIC 2010 HTTP, CIT reduces average length from 330 to 216 tokens and improves drift accuracy from $\approx$0.50 to 0.92 under token-fair budgets.
+On Adult, CIT shortens sequences by 43\% and reduces P95 inference latency while matching accuracy.
 \end{abstract}

@@ -121,7 +121,7 @@ Thus $R(\tau_{\mathcal{V}_{k+1}})\le R(\tau_{\mathcal{V}_k})$ for all $k$.
 \section{Additional Related Work Context}
 \label{sec:appendix_related_work}
 
-This paper focuses on drop-in tokenization interfaces for encoder-only models; we note several complementary lines of work for context.
+This paper focuses on drop-in tokenization interfaces for token-sequence predictors under strict deployment constraints; we note several complementary lines of work for context.
 Efficient attention mechanisms and long-sequence Transformers provide alternatives to reduce the cost of long inputs~\cite{beltagy2020longformer,zaheer2020bigbird,guo2019star}, and scaling studies further motivate careful control of sequence length and compute allocation~\cite{kaplan2020scaling,zhai2022scaling}.
 For structured and tabular domains, table-pretraining and table-understanding models provide domain-specific baselines~\cite{wang2021tuta,deng2022turl}, and text-to-SQL benchmarks capture related structured prediction settings~\cite{zhong2017seq2sql,yu2018spider}.
 Deep tabular architectures that do not rely on record-to-text serialization provide an additional point of comparison~\cite{huang2020tabtransformer,gorishniy2021revisiting}.

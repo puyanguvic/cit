@@ -2,8 +2,10 @@
 \label{sec:intro}
 
 Tokenization is often treated as a benign preprocessing step.
-In encoder-only systems operating under hard sequence and latency budgets, it is instead a fixed \emph{representation interface}: inputs are deterministically serialized into strings and then irrevocably segmented into tokens, after which all computation is conditioned on the token sequence.
-In this strict drop-in setting, changing the tokenizer changes the interface contract between raw symbolic inputs and the encoder, and therefore changes which distinctions can \emph{ever} be represented, learned, and recovered under binding token budgets.
+In professional structured and semi-structured classification pipelines, performance matters, but it must be delivered under hard throughput, latency, and context-length constraints.
+Under these deployment constraints, tokenization is not merely formatting: it is a fixed \emph{representation interface}.
+Inputs are deterministically serialized into strings and segmented into tokens, after which all downstream computation is conditioned on the token sequence.
+Many such systems use encoder-style discriminative models for efficiency, but the central object here is the interface itself: changing the tokenizer changes the contract between raw symbolic inputs and the model, and therefore changes which distinctions can \emph{ever} be represented, learned, and recovered under binding token budgets.
 
 Structured and semi-structured streams make this interface problem acute.
 Their semantics is role- and boundary-dependent: the same character substring may be a key, a delimiter, or a value depending on its position and surrounding syntax.
@@ -14,13 +16,15 @@ Collapse is an interface property: once it happens, no downstream encoder operat
 This is especially damaging for streaming or early-decision settings and for any deployment with hard maximum sequence lengths.
 
 Canonical tokenizers fail on structured inputs in a structural way.
-WordPiece and BPE optimize subword statistics largely driven by natural language, without constraints that respect role boundaries or typed value spans.
+WordPiece~\cite{schuster2012japanese,wu2016gnmt} and BPE~\cite{gage1994new,sennrich2016neural} optimize subword statistics largely driven by natural language, without constraints that respect role boundaries or typed value spans.
 As a result, they may segment across boundary-bearing symbols, entangle role cues with incidental value fragments, and become brittle to semantics-preserving re-serialization (e.g., benign field reordering, whitespace/escaping normalization).
 Conversely, using finer-grained pieces to avoid brittleness often leads to heavy-tailed token lengths on high-cardinality fields, inflating attention cost and truncation risk.
+These effects are consistent with broader evidence that tokenizer choice and granularity can materially affect downstream behavior and robustness~\cite{rust2021good,bostrom2020byte,mielke2021between}.
 
 These interface effects appear immediately under standard encoder limits.
-In a scan of six widely used pretrained tokenizers on 5{,}000 CSIC 2010 HTTP requests with $L_{\max}{=}512$, average sequence lengths range from 359--468 tokens and 7--29\% of examples exceed the limit (29.4\% for BERT WordPiece; 7.3\% for a GPT-3.5/GPT-4-family tokenizer; Table~\ref{tab:e0_tokenizer_playground}).
+In a scan of six widely used pretrained tokenizers on 5{,}000 CSIC 2010 HTTP requests~\cite{torrano2010csic} with $L_{\max}{=}512$, average sequence lengths range from 359--468 tokens and 7--29\% of examples exceed the limit (29.4\% for BERT WordPiece; 7.3\% for a GPT-3.5/GPT-4-family tokenizer; Table~\ref{tab:e0_tokenizer_playground}).
 The tail is heavy: the longest request reaches 1{,}034 tokens, illustrating that truncation risk is an interface property of segmentation rather than a modeling detail.
+Many widely deployed GPT-family tokenizers are also BPE-derived and inherit similar interface trade-offs~\cite{radford2019language,brown2020language}.
 
 % \begin{figure}[t]
 % \centering
@@ -55,6 +59,26 @@ Our contributions are:
 
 
 The remainder of the paper develops the interface formulation, presents CIT, and evaluates its efficiency, robustness, and end-to-end impact under strict drop-in constraints.
+Additional proofs, vocabulary-budget sweep results, and extra context are provided in the supplementary appendix.
+
+\section{Related Work}
+\label{sec:related}
+
+\paragraph{Subword tokenization and robustness.}
+Modern tokenizers for neural text models are typically learned subword segmenters, including WordPiece~\cite{schuster2012japanese,wu2016gnmt}, BPE~\cite{gage1994new,sennrich2016neural}, and Unigram/SentencePiece~\cite{kudo2018subword,kudo2018sentencepiece}.
+While effective on natural language, their merges are largely frequency-driven and can be brittle under distribution shift or when task semantics depend on non-linguistic boundaries.
+Prior work has documented that tokenizer choice and granularity can materially affect downstream accuracy and robustness, even with the same model family and training recipe~\cite{rust2021good,mielke2021between,bostrom2020byte}.
+Our work complements these studies by focusing on structured streams and by making the \emph{prefix} irreversibility of interface failures explicit.
+
+\paragraph{Byte-level and token-free interfaces.}
+Token-free modeling at the byte or character level avoids segmentation errors and preserves all raw information, but typically increases sequence length and compute~\cite{xue2022byt5,clark2022canine,yu2023megabyte}.
+These approaches trade semantic fidelity for rate through architectural changes (e.g., downsampling or multiscale processing), whereas our setting holds the downstream encoder fixed under a strict drop-in constraint.
+CIT instead targets a middle ground: it preserves task-critical boundaries and typed value spans via an explicit contract, then compresses within the remaining feasible space under deployed execution.
+
+\paragraph{Structured prediction via serialization.}
+A common strategy for applying sequence models to non-linguistic inputs is to serialize structured records into text~\cite{yin2020tabert,herzig2020tapas} or to treat protocol/log streams as symbolic sequences with schema-dependent semantics~\cite{he2017drain,du2017deeplog}.
+In these pipelines, the serialization and tokenizer jointly determine what information reaches the model under finite context and latency budgets.
+Our interface view formalizes this coupling and provides tools (directed semantic distortion and contract-constrained induction) to reason about tokenization choices in such structured deployments.
 
 
 \section{Problem Formulation}
@@ -67,7 +91,7 @@ Our goal is to characterize how interface design induces an irreversible compres
 \label{sec:setup}
 
 Each input example originates from a structured or semi-structured record $r \in \mathcal{R}$, such as a tabular row, a key--value map, or a protocol/log event.
-To enable the use of encoder-only neural models, records are deterministically serialized into symbolic strings
+To enable the use of standard token-sequence predictors (e.g., Transformer encoders for classification), records are deterministically serialized into symbolic strings
 \begin{equation}
 X \;=\; s(r) \in \Sigma^\ast,
 \label{eq:serialization}
@@ -120,7 +144,7 @@ The best achievable semantics under the interface at prefix length $t$ is
 
 Because $\tau$ is deterministic and prefix-emitting, the mapping $X_{1:t} \mapsto Z^{(t)}$ is generally many-to-one.
 Distinct raw prefixes can therefore induce the same observable token prefix, forcing any token-observing predictor to average over their semantics.
-This identifies a fundamental \emph{irreversibility} at the interface: once two raw prefixes collapse to the same $Z^{(t)}$, no downstream encoder-only model can distinguish them without modifying the interface itself.
+This identifies a fundamental \emph{irreversibility} at the interface: once two raw prefixes collapse to the same $Z^{(t)}$, no downstream model that only observes tokenized prefixes under the same interface can distinguish them without modifying the interface itself.
 In structured settings, such collapse commonly arises when segmentation crosses role boundaries or fragments high-cardinality values whose internal characters are semantically irrelevant but whose integrity is role-critical~\cite{yin2020tabert,herzig2020tapas}.
 
 \subsection{Directed Semantic Distortion}
@@ -157,7 +181,7 @@ The \emph{directed semantic distortion} of tokenizer $\tau$ is defined as the av
 
 This definition makes three properties explicit.
 First, $\Delta(\tau)\ge 0$ by construction: restricting observations from $X_{1:t}$ to $Z^{(t)}$ cannot improve the best achievable risk.
-Second, $\Delta(\tau)$ is an \emph{interface-level} quantity: it depends only on what information the tokenizer preserves about prefixes and upper-bounds the performance of any downstream encoder-only model operating under the same interface.
+Second, $\Delta(\tau)$ is an \emph{interface-level} quantity: it depends only on what information the tokenizer preserves about prefixes and upper-bounds the performance of any downstream model operating under the same tokenization interface.
 Third, prefix averaging penalizes interfaces that delay task-relevant information to later tokens, which is critical under truncation and token-budget constraints.
 
 In practice, $\Delta(\tau)$ is not directly observable because it depends on Bayes-optimal semantics.
@@ -173,7 +197,7 @@ We quantify interface cost by the expected token length
 R(\tau) \;\triangleq\; \mathbb{E}[|Z|],
 \label{eq:rate}
 \end{equation}
-which directly controls effective context length and inference cost in encoder-only models.
+which directly controls effective context length and inference cost in token-sequence models.
 
 Let $B$ denote a vocabulary budget, and define the drop-in feasible set
 \begin{equation}
@@ -306,7 +330,7 @@ We study tokenization as a fixed representation interface for supervised predict
 semi-structured symbolic inputs.
 Each example originates from a structured record $r \in \mathcal{R}$, such as a tabular row, a key--value map,
 or a protocol/log event.
-To enable the use of encoder-only neural encoders, records are deterministically serialized into symbolic
+To enable the use of standard token-sequence predictors (e.g., Transformer encoders for classification), records are deterministically serialized into symbolic
 strings
 \begin{equation}
 X \;=\; s(r) \in \Sigma^\ast,
@@ -333,7 +357,7 @@ which is irrevocably determined by the prefix.
 This requirement models streaming and early-decision settings, and it induces a causal interface between the
 raw input stream and the model's available observations at inference time.
 
-In encoder-only Transformers, inference cost scales at least linearly—and often superlinearly—with token
+In Transformer encoders, inference cost scales at least linearly—and often superlinearly—with token
 sequence length due to self-attention~\cite{vaswani2017attention,kaplan2020scaling}.
 Consequently, under small-model and low-latency constraints, tokenization directly controls effective context
 length, truncation behavior, and compute allocation.
@@ -377,7 +401,7 @@ Because $\tau$ is deterministic and prefix-emitting, the mapping $X_{1:t} \mapst
 Distinct raw prefixes can therefore induce the same observable token prefix, forcing any token-observing
 predictor to average over their semantics.
 This identifies an \emph{irreversibility} at the interface: once two raw prefixes collapse to the same
-$Z^{(t)}$, no downstream encoder-only model can distinguish them without changing the interface.
+$Z^{(t)}$, no downstream model that only observes tokenized prefixes can distinguish them without changing the interface.
 In structured settings, this collapse can occur when segmentation crosses role boundaries or fragments
 high-cardinality values whose internal characters are not semantically meaningful but whose integrity is
 role-critical~\cite{yin2020tabert,herzig2020tapas}.
@@ -422,8 +446,8 @@ This definition makes three aspects explicit.
 First, $\Delta(\tau)\ge 0$ by construction: restricting observations from $X_{1:t}$ to $Z^{(t)}$ cannot improve
 the best achievable risk under the same loss.
 Second, $\Delta(\tau)$ is an \emph{interface property}: it depends on what information $\tau$ preserves about
-prefixes, and it upper-bounds the performance one can obtain from any downstream encoder-only model without
-changing the interface.
+prefixes, and it upper-bounds the performance one can obtain from any downstream model that observes only
+tokenized prefixes, without changing the interface.
 Third, the prefix averaging penalizes interfaces that delay task-relevant information to later tokens, which is
 critical under truncation and token-budget constraints.
 
@@ -439,7 +463,7 @@ We quantify interface cost by the expected token length
 R(\tau) \;\triangleq\; \mathbb{E}[|Z|],
 \label{eq:rate_def}
 \end{equation}
-which directly controls effective context length and inference cost in encoder-only models.
+which directly controls effective context length and inference cost in token-sequence models.
 
 Let $B$ denote a vocabulary budget, and define the drop-in feasible set
 \begin{equation}
@@ -614,7 +638,7 @@ artifact suitable for latency-sensitive systems.
 We now formalize two properties that clarify the role of the tokenization interface and the behavior of
 the greedy construction procedure.
 The first establishes that information loss induced by the interface is fundamentally irrecoverable by
-any downstream encoder-only model.
+any downstream model that only observes tokenized prefixes.
 The second shows that the proposed greedy algorithm is consistent with the deployment-aligned objective
 introduced in Section~\ref{sec:bg_frontier}.
 
@@ -634,7 +658,7 @@ $\mathcal{S}(X_{1:t}) \neq \mathcal{S}(X'_{1:t})$, then for any strictly proper 
 \end{proposition}
 
 Proposition~\ref{prop:irrecoverability} makes explicit that semantic distinctions collapsed by the
-tokenization interface cannot be recovered by any downstream encoder-only model without modifying the
+tokenization interface cannot be recovered by any downstream model that only observes tokenized prefixes, without modifying the
 interface itself.
 This property underlies the definition of directed semantic distortion in
 Section~\ref{sec:bg_distortion} and motivates optimizing tokenization as an interface-level design problem
@@ -817,7 +841,7 @@ E0 and E4 provide complementary evidence on off-the-shelf interface cost and add
 
 Our results support the view that tokenization for domain-specific prediction should prioritize specialization over generality.
 On structured inputs, frequency-driven compression alone is insufficient and can actively harm task performance by conflating semantic roles.
-CIT demonstrates that enforcing interface constraints and aligning vocabulary induction with task semantics yields more efficient and robust representations, particularly for small encoder-only models.
+CIT demonstrates that enforcing interface constraints and aligning vocabulary induction with task semantics yields more efficient and robust representations, particularly for small encoder-style classifiers.
 
 
 \section{Conclusion}
