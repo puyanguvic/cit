@@ -1,12 +1,3 @@
-\begin{abstract}
-Tokenization serves as a fixed interface between raw symbolic inputs and neural encoders, yet most existing tokenizers are optimized for large language models and natural language distributions.
-When used as drop-in components in structured and semi-structured prediction pipelines, such tokenizers induce uncontrolled compression that distorts role-dependent semantics and wastes token budget under tight compute constraints.
-We formalize tokenization as a constrained interface design problem and introduce \emph{directed semantic distortion}, a prefix-aligned measure of irrecoverable task-relevant information loss induced by the interface.
-Based on this formulation, we propose \textbf{Controlled Interface Tokenization (CIT)}, which enforces a versioned interface contract with role-explicit boundaries and typed-value integrity, and constructs task-specialized vocabularies by maximizing compression efficiency within the contract under deterministic execution.
-Directed semantic distortion is used to evaluate and calibrate semantic fidelity across tokenizers and budgets, yielding empirical rate--distortion frontiers.
-Across synthetic and public structured classification tasks, CIT achieves superior rate--distortion trade-offs, higher accuracy under matched token budgets, and improved robustness to semantics-preserving re-serialization and prefix-limited prediction.
-\end{abstract}
-
 \section{Introduction}
 \label{sec:intro}
 
@@ -572,17 +563,17 @@ Optionally, one may refine the greedy choice by re-ranking a small top-$K$ short
 \caption{Controlled Interface Tokenization (CIT)}
 \label{alg:cit}
 \begin{algorithmic}[1]
-\STATE \textbf{Input:} Training corpus $\mathcal{D}$, vocabulary budget $B$, interface contract $\mathcal{K}$
-\STATE \textbf{Initialize:} $\mathcal{V}_0 \leftarrow$ atomic contract vocabulary induced by $\mathcal{K}$
-\FOR{$k = 0$ \textbf{to} $B-|\mathcal{V}_0|-1$}
-    \STATE Construct contract-feasible candidate set $\mathcal{C}(\mathcal{V}_k)$
-    \FOR{each $c \in \mathcal{C}(\mathcal{V}_k)$}
-        \STATE Estimate compression gain $G(c;\mathcal{V}_k)$ under deployed execution (Eq.~\eqref{eq:gain_def})
-    \ENDFOR
-    \STATE Select $c_k$ using Eq.~\eqref{eq:alg_selection_gain}
-    \STATE Update $\mathcal{V}_{k+1} \leftarrow \mathcal{V}_k \cup \{c_k\}$
-\ENDFOR
-\STATE \textbf{Output:} Vocabulary $\mathcal{V}_B$ and tokenizer $\tau_{\mathcal{V}_B}$
+\State \textbf{Input:} Training corpus $\mathcal{D}$, vocabulary budget $B$, interface contract $\mathcal{K}$
+\State \textbf{Initialize:} $\mathcal{V}_0 \leftarrow$ atomic contract vocabulary induced by $\mathcal{K}$
+\For{$k = 0$ \textbf{to} $B-|\mathcal{V}_0|-1$}
+    \State Construct contract-feasible candidate set $\mathcal{C}(\mathcal{V}_k)$
+    \For{each $c \in \mathcal{C}(\mathcal{V}_k)$}
+        \State Estimate compression gain $G(c;\mathcal{V}_k)$ under deployed execution (Eq.~\eqref{eq:gain_def})
+    \EndFor
+    \State Select $c_k$ using Eq.~\eqref{eq:alg_selection_gain}
+    \State Update $\mathcal{V}_{k+1} \leftarrow \mathcal{V}_k \cup \{c_k\}$
+\EndFor
+\State \textbf{Output:} Vocabulary $\mathcal{V}_B$ and tokenizer $\tau_{\mathcal{V}_B}$
 \end{algorithmic}
 \end{algorithm}
 
@@ -736,7 +727,7 @@ In contrast, CIT prevents collapse by enforcing typed-span integrity and role-aw
 The lossless byte-level interface preserves raw information but is prohibitively high-rate under a strict length cap, leading to truncation and poor downstream accuracy under compute-matched training.
 
 Results are summarized in Table~\ref{tab:e1_synth}.
-\input{results/paper/paper_artifacts/main/tables/e1_synth.tex}
+\input{results/Tables/e1_synth}
 
 Two ablations collapse back to chance: disabling typed-value normalization (\textsc{CIT\_no\_typed}) or disabling the contract (\textsc{CIT\_no\_contract}) removes the interface constraints that prevent collapse.
 Together, these results support a causal interpretation: the gains come from interface correctness, not from incidental frequency effects of a different vocabulary.
@@ -753,11 +744,11 @@ This shifts the accuracy--length frontier and yields large robustness gains unde
 Compared to the lossless byte-level interface, CIT attains much higher accuracy and robustness at far lower rate by enforcing interface constraints rather than relying on lossless tokenization.
 
 Table~\ref{tab:e2_csic_token_fair} summarizes final accuracy, drift accuracy, and token-length statistics under token-fair training, and Figure~\ref{fig:e2_csic_token_fair_frontier_acc_vs_len} shows the resulting accuracy--length frontier.
-\input{results/paper/paper_artifacts/main/tables/e2_csic_token_fair.tex}
+\input{results/Tables/e2_csic_token_fair}
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=\linewidth]{Figs/e2_csic_token_fair_frontier_acc_vs_len.pdf}
+\includegraphics[width=\linewidth]{results/Figs/e2_csic_token_fair_frontier_acc_vs_len.pdf}
 \caption{E2 (CSIC 2010 HTTP) token-fair frontier (10M tokens, $L_{\max}{=}512$): accuracy vs.\ average sequence length. Filled markers show test accuracy and hollow markers show drift accuracy under semantics-preserving re-serialization; vertical segments visualize the robustness gap. Colors denote tokenizers and marker shapes denote model size.}
 \label{fig:e2_csic_token_fair_frontier_acc_vs_len}
 \end{figure}
@@ -769,7 +760,7 @@ We further run a token-budget sweep (1/2/5/10M tokens) to characterize how inter
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=\linewidth]{Figs/e2_csic_budget_scaling.pdf}
+\includegraphics[width=\linewidth]{results/Figs/e2_csic_token_fair_frontier_acc_vs_len.pdf}
 \caption{E2 (CSIC 2010 HTTP) token-budget sweep: accuracy as a function of token budget (log-scale). We report mean $\pm$ std.\ over seeds (0/1/2).}
 \label{fig:e2_csic_budget_scaling}
 \end{figure}
@@ -785,7 +776,7 @@ The byte-level baseline provides a complementary operating point with high fidel
 Overall, CIT improves operating points on the accuracy--latency frontier while also reducing surrogate distortion, indicating that efficiency gains do not come from collapsing task-relevant prefix information.
 
 Results are summarized in Table~\ref{tab:e3_pareto} and Figure~\ref{fig:e3_pareto}.
-\input{results/paper/paper_artifacts/main/tables/e3_pareto.tex}
+\input{results/Tables/e3_pareto}
 
 \begin{figure*}[t]
 \centering
@@ -824,8 +815,3 @@ CIT demonstrates that enforcing interface constraints and aligning vocabulary in
 We formulated tokenization as controlled interface compression under a drop-in regime and introduced directed semantic distortion as a principled interface metric.
 We proposed Controlled Interface Tokenization, aligning feasible constraints, vocabulary induction, and deterministic execution.
 Across synthetic and public structured benchmarks, CIT improves rate--distortion trade-offs, downstream accuracy under matched training budgets, and robustness to re-serialization and prefix-limited prediction.
-
-\section*{Impact Statement}
-
-This work improves efficiency and robustness in structured prediction pipelines under fixed compute budgets.
-Applications should follow responsible data handling and privacy-preserving practices.
