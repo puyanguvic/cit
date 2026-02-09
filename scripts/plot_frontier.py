@@ -138,7 +138,9 @@ def plot_frontier(
         and x_key in {"avg_len", "total_tokens"}
     )
 
-    fig, ax = plt.subplots(figsize=(6.6, 3.2))
+    compact_names = {"frontier_len_vs_distortion", "frontier_tokenize_ms_vs_len"}
+    is_compact = outpath.name in compact_names
+    fig, ax = plt.subplots(figsize=(3.45, 2.65) if is_compact else (6.6, 3.2))
 
     all_xs: list[float] = []
     all_ys: list[float] = []
@@ -449,117 +451,194 @@ def plot_frontier(
                     continue
             vocab_sizes = sorted({v for v in vocab_sizes if v > 0})
 
-        for name in group_names:
-            color = _tokenizer_color(name)
-            is_highlight = name == "CIT"
-            rs = groups[name]
+        # A compact, more readable design for the appendix rate--distortion plot.
+        is_rate_distortion = bool(style_key == "vocab_size" and x_key == "avg_len" and y_key == "distortion_hat")
 
-            # Sort by x for a sensible visual trend.
-            pairs = []
-            for r in rs:
-                x = to_float(r.get(x_key))
-                y = to_float(r.get(y_key))
-                pairs.append((x, y, r))
-                all_xs.append(x)
-                all_ys.append(y)
-            if style_key == "vocab_size":
-                def _vkey(t):
-                    r = t[2]
+        if is_rate_distortion:
+            # Trajectory per tokenizer, marker shapes denote vocab size. Directly
+            # label curves at the largest vocab to avoid a crowded legend in a
+            # half-column figure.
+            label_offsets = {
+                "CIT": (6, -2),
+                "BPE": (6, 6),
+                "WordPiece": (6, -8),
+                "Unigram": (6, 6),
+                "Bytes": (6, 6),
+            }
+
+            for name in group_names:
+                color = _tokenizer_color(name)
+                is_highlight = name == "CIT"
+                rs = groups[name]
+
+                pairs: list[tuple[int, float, float, dict]] = []
+                for r in rs:
                     try:
-                        return int(float(r.get("vocab_size", 0)))
+                        v = int(float(r.get("vocab_size", 0)))
                     except Exception:
-                        return 0
-                pairs.sort(key=_vkey)
-            else:
-                pairs.sort(key=lambda t: (t[0], t[1]))
+                        v = 0
+                    x = to_float(r.get(x_key))
+                    y = to_float(r.get(y_key))
+                    pairs.append((v, x, y, r))
+                    all_xs.append(x)
+                    all_ys.append(y)
+                pairs = [p for p in pairs if p[0] > 0]
+                pairs.sort(key=lambda t: t[0])
 
-            xs = [p[0] for p in pairs]
-            ys = [p[1] for p in pairs]
+                xs = [p[1] for p in pairs]
+                ys = [p[2] for p in pairs]
+                if len(pairs) >= 2:
+                    ax.plot(
+                        xs,
+                        ys,
+                        color=color,
+                        linewidth=2.4 if is_highlight else 1.6,
+                        alpha=0.95 if is_highlight else 0.70,
+                        zorder=2,
+                    )
 
-            # For vocab sweeps, draw a light trajectory line to show the
-            # progression as vocab grows (even for tokenize-time plots).
-            if style_key == "vocab_size" and len(pairs) >= 2:
-                ls = "--" if (x_key == "avg_len" and y_key == "tokenize_ms_per_sample") else "-"
-                lw = 1.8 if ls == "--" else 2.2
-                alpha = 0.95 if is_highlight else 0.75
-                ax.plot(xs, ys, color=color, linewidth=lw, linestyle=ls, alpha=alpha, label=name, zorder=2)
+                for v, x, y, _r in pairs:
+                    marker = VOCAB_MARKERS.get(v, "o")
+                    ax.scatter(
+                        [x],
+                        [y],
+                        s=58 if is_highlight else 46,
+                        marker=marker,
+                        color=color,
+                        edgecolors="black" if is_highlight else "white",
+                        linewidths=0.9 if is_highlight else 0.7,
+                        zorder=3 if is_highlight else 2.5,
+                    )
 
-                if is_highlight and x_key == "distortion_hat" and y_key == "avg_len":
-                    # Endpoint labels help communicate the vocab progression.
-                    try:
-                        v0 = int(float(pairs[0][2].get("vocab_size", 0)))
-                        v1 = int(float(pairs[-1][2].get("vocab_size", 0)))
-                    except Exception:
-                        v0, v1 = 0, 0
-                    if v0 > 0:
-                        ax.annotate(
-                            str(v0),
-                            xy=(xs[0], ys[0]),
-                            xytext=(5, 5),
-                            textcoords="offset points",
-                            fontsize=8,
-                            color=color,
-                            weight="bold",
-                        )
-                    if v1 > 0:
-                        ax.annotate(
-                            str(v1),
-                            xy=(xs[-1], ys[-1]),
-                            xytext=(5, 5),
-                            textcoords="offset points",
-                            fontsize=8,
-                            color=color,
-                            weight="bold",
-                        )
+                # Label the largest-vocab point.
+                if pairs:
+                    v_last, x_last, y_last, _r_last = pairs[-1]
+                    dx, dy = label_offsets.get(name, (6, 6))
+                    ax.annotate(
+                        name,
+                        xy=(x_last, y_last),
+                        xytext=(dx, dy),
+                        textcoords="offset points",
+                        fontsize=9,
+                        weight="bold" if is_highlight else "normal",
+                        color=color,
+                    )
 
-            # Scatter points with optional marker by style_key.
-            for x, y, r in pairs:
-                marker = "o"
-                if style_key == "model":
-                    marker = MODEL_MARKERS.get(str(r.get("model", "")), "o")
-                elif style_key == "vocab_size":
-                    try:
-                        marker = VOCAB_MARKERS.get(int(float(r.get("vocab_size", 0))), "o")
-                    except Exception:
-                        marker = "o"
-                s = 58 if is_highlight else 42
-                edge = "black" if is_highlight else "white"
-                lw = 0.9 if is_highlight else 0.6
-                z = 4 if is_highlight else 3
-                ax.scatter([x], [y], s=s, marker=marker, color=color, edgecolors=edge, linewidths=lw, zorder=z)
-
-        tok_handles: list[Line2D] = []
-        tok_ls = "--" if (style_key == "vocab_size" and x_key == "avg_len" and y_key == "tokenize_ms_per_sample") else "-"
-        for name in group_names:
-            tok_handles.append(
-                Line2D(
-                    [0],
-                    [0],
-                    marker="o",
-                    color=_tokenizer_color(name),
-                    linestyle=tok_ls if show_vocab_lines else "None",
-                    label=name,
-                    linewidth=2.0,
-                )
-            )
-        leg1 = ax.legend(handles=tok_handles, loc="best", frameon=False)
-        if style_key == "vocab_size" and vocab_sizes:
-            ax.add_artist(leg1)
+            # Legend: vocab shapes only (tokenizers are labeled on-plot).
             vocab_handles: list[Line2D] = []
             for v in vocab_sizes:
-                marker = VOCAB_MARKERS.get(v, "o")
                 vocab_handles.append(
                     Line2D(
                         [0],
                         [0],
-                        marker=marker,
+                        marker=VOCAB_MARKERS.get(v, "o"),
                         color="black",
                         linestyle="None",
                         label=str(v),
-                        markersize=7,
+                        markersize=6.5,
                     )
                 )
-            ax.legend(handles=vocab_handles, title="Vocab", loc="lower right", frameon=False)
+            ax.legend(handles=vocab_handles, title="Vocab", loc="upper right", frameon=False, borderaxespad=0.2)
+
+            # "Better" direction cue: lower length + lower distortion.
+            try:
+                ax.annotate(
+                    "better",
+                    xy=(0.07, 0.12),
+                    xytext=(0.22, 0.26),
+                    xycoords="axes fraction",
+                    textcoords="axes fraction",
+                    arrowprops={"arrowstyle": "->", "lw": 1.0, "color": "#666666"},
+                    fontsize=9,
+                    color="#666666",
+                )
+            except Exception:
+                pass
+        else:
+            for name in group_names:
+                color = _tokenizer_color(name)
+                is_highlight = name == "CIT"
+                rs = groups[name]
+
+                # Sort by x for a sensible visual trend.
+                pairs = []
+                for r in rs:
+                    x = to_float(r.get(x_key))
+                    y = to_float(r.get(y_key))
+                    pairs.append((x, y, r))
+                    all_xs.append(x)
+                    all_ys.append(y)
+                if style_key == "vocab_size":
+                    def _vkey(t):
+                        r = t[2]
+                        try:
+                            return int(float(r.get("vocab_size", 0)))
+                        except Exception:
+                            return 0
+                    pairs.sort(key=_vkey)
+                else:
+                    pairs.sort(key=lambda t: (t[0], t[1]))
+
+                xs = [p[0] for p in pairs]
+                ys = [p[1] for p in pairs]
+
+                # For vocab sweeps, draw a light trajectory line to show the
+                # progression as vocab grows (even for tokenize-time plots).
+                if style_key == "vocab_size" and len(pairs) >= 2:
+                    ls = "--" if (x_key == "avg_len" and y_key == "tokenize_ms_per_sample") else "-"
+                    lw = 1.8 if ls == "--" else 2.2
+                    alpha = 0.95 if is_highlight else 0.75
+                    ax.plot(xs, ys, color=color, linewidth=lw, linestyle=ls, alpha=alpha, label=name, zorder=2)
+
+                # Scatter points with optional marker by style_key.
+                for x, y, r in pairs:
+                    marker = "o"
+                    if style_key == "model":
+                        marker = MODEL_MARKERS.get(str(r.get("model", "")), "o")
+                    elif style_key == "vocab_size":
+                        try:
+                            marker = VOCAB_MARKERS.get(int(float(r.get("vocab_size", 0))), "o")
+                        except Exception:
+                            marker = "o"
+                    s = 58 if is_highlight else 42
+                    edge = "black" if is_highlight else "white"
+                    lw = 0.9 if is_highlight else 0.6
+                    z = 4 if is_highlight else 3
+                    ax.scatter([x], [y], s=s, marker=marker, color=color, edgecolors=edge, linewidths=lw, zorder=z)
+
+        if not is_rate_distortion:
+            tok_handles: list[Line2D] = []
+            tok_ls = "--" if (style_key == "vocab_size" and x_key == "avg_len" and y_key == "tokenize_ms_per_sample") else "-"
+            for name in group_names:
+                tok_handles.append(
+                    Line2D(
+                        [0],
+                        [0],
+                        marker="o",
+                        color=_tokenizer_color(name),
+                        linestyle=tok_ls if show_vocab_lines else "None",
+                        label=name,
+                        linewidth=2.0,
+                    )
+                )
+            leg1 = ax.legend(handles=tok_handles, loc="best", frameon=False)
+            if style_key == "vocab_size" and vocab_sizes:
+                ax.add_artist(leg1)
+                vocab_handles: list[Line2D] = []
+                for v in vocab_sizes:
+                    marker = VOCAB_MARKERS.get(v, "o")
+                    vocab_handles.append(
+                        Line2D(
+                            [0],
+                            [0],
+                            marker=marker,
+                            color="black",
+                            linestyle="None",
+                            label=str(v),
+                            markersize=7,
+                        )
+                    )
+                ax.legend(handles=vocab_handles, title="Vocab", loc="lower right", frameon=False)
 
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
@@ -616,10 +695,10 @@ def main():
         plot_frontier(
             rows,
             group_key=args.group_key,
-            x_key="distortion_hat",
-            y_key="avg_len",
-            xlabel=r"$\hat{\Delta}$ (prefix KL surrogate)",
-            ylabel="avg_len (tokens/sample)",
+            x_key="avg_len",
+            y_key="distortion_hat",
+            xlabel="avg_len (tokens/sample)",
+            ylabel=r"$\hat{\Delta}$ (prefix KL surrogate)",
             outpath=run_dir / f"{prefix}frontier_len_vs_distortion",
         )
 
