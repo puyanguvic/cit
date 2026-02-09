@@ -4,20 +4,7 @@
 \label{sec:appendix_experiments}
 
 This appendix reports complementary evidence supporting the main-paper claims and clarifies controls that disentangle interface effects from optimization artifacts.
-We report a vocabulary-budget sweep that traces interface trade-offs.
-
-\subsection{Appendix: Vocabulary-Budget Frontier}
-\label{sec:appendix_frontier}
-
-Finally, we sweep vocabulary budgets to trace empirical rate--distortion trade-offs and tokenization-time behavior under deployment-aligned execution.
-For each vocabulary size, we train each tokenizer on the same training serialization and evaluate (avg./P95) token length, surrogate distortion $\widehat{\Delta}(\tau)$, and tokenization time.
-This sweep illustrates how interface constraints and distortion-aware induction shift the frontier, yielding better operating points under tight budgets.
-
-Table~\ref{tab:appendix_frontier} reports the aggregated sweep results.
-End-to-end accuracy frontiers require full encoder training at each budget; here we use the sweep to characterize the interface-level operating points (rate, distortion, and runtime).
-\input{Tables/frontier.tex}
-\paragraph{Note.}
-For readability, we present this sweep as a table and omit the corresponding plots.
+It also collects deferred proofs and additional context.
 
 \paragraph{Reproducibility.}
 All main-paper and appendix experiments are implemented as deterministic scripts with fixed serialization and compute-matched training budgets, and the full suite can be run end-to-end from a single driver that also exports publication-ready tables and figures.

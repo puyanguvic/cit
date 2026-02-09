@@ -59,7 +59,7 @@ Our contributions are:
 
 
 The remainder of the paper develops the interface formulation, presents CIT, and evaluates its efficiency, robustness, and end-to-end impact under strict drop-in constraints.
-Additional proofs, vocabulary-budget sweep results, and extra context are provided in the supplementary appendix.
+Additional proofs and extended context are provided in the supplementary appendix.
 
 \section{Related Work}
 \label{sec:related}
@@ -79,6 +79,11 @@ CIT instead targets a middle ground: it preserves task-critical boundaries and t
 A common strategy for applying sequence models to non-linguistic inputs is to serialize structured records into text~\cite{yin2020tabert,herzig2020tapas} or to treat protocol/log streams as symbolic sequences with schema-dependent semantics~\cite{he2017drain,du2017deeplog}.
 In these pipelines, the serialization and tokenizer jointly determine what information reaches the model under finite context and latency budgets.
 Our interface view formalizes this coupling and provides tools (directed semantic distortion and contract-constrained induction) to reason about tokenization choices in such structured deployments.
+
+\paragraph{Long-context and non-serialization alternatives.}
+Some approaches address long structured inputs by changing the backbone rather than the interface, e.g., through efficient attention or long-sequence Transformers~\cite{beltagy2020longformer,zaheer2020bigbird,guo2019star}, or by scaling model and compute budgets~\cite{kaplan2020scaling,zhai2022scaling}.
+For tabular domains, deep tabular architectures avoid record-to-text serialization altogether~\cite{huang2020tabtransformer,gorishniy2021revisiting}, and table-pretrained models provide structured baselines~\cite{wang2021tuta,deng2022turl}.
+These directions are complementary: CIT targets drop-in deployments where the encoder is fixed and the interface is the highest-leverage modifiable component.
 
 
 \section{Problem Formulation}
@@ -263,9 +268,15 @@ This prevents merges that conflate distinct semantic roles, such as key--value s
 Many structured domains contain high-cardinality values (e.g., identifiers, timestamps, addresses) whose internal character structure is not semantically meaningful but whose integrity is role-critical.
 The contract specifies a set of typed-value classes and enforces their atomicity: typed values are treated as indivisible units, and neither segmentation nor vocabulary induction may split them.
 This constraint prevents interface collapse caused by fragmenting unstable value instances.
+In practice, this is implemented via deterministic span typing and normalization (e.g., mapping a value instance to a compact type marker, optionally augmented with coarse attributes such as a length bucket), which preserves role information while preventing heavy-tailed value strings from dominating the token budget.
+
+\paragraph{Contract instantiation.}
+We instantiate contracts with lightweight, domain-specific rules.
+For CSIC HTTP, we declare request/field delimiters (e.g., \texttt{/}, \texttt{?}, \texttt{\&}, \texttt{=}, \texttt{:}) as non-crossable boundaries and type common high-cardinality spans (e.g., numeric IDs, IP addresses, and long hex strings) as atomic units.
+For tabular datasets, we treat field separators and \texttt{key=value} structure as boundaries and assign coarse value types (categorical, numeric, missing), which makes benign re-serializations largely semantically inert at the interface.
 
 Together, these constraints define a contract-feasible space of tokenizations that preserve role semantics and value integrity by construction.
-All tokenizers evaluated under CIT share the same contract, ensuring that comparisons isolate the effect of vocabulary construction rather than upstream preprocessing.
+All CIT variants in our evaluation share the same contract specification unless explicitly ablated (e.g., \textsc{CIT\_no\_contract}, \textsc{CIT\_no\_typed}).
 
 \subsection{Deterministic Prefix-Emitting Execution}
 \label{sec:execution}
@@ -298,6 +309,7 @@ that is, the reduction in expected token length when $c$ is added to the vocabul
 
 Unlike frequency-based criteria used in classical subword induction, $G(c;\mathcal{V})$ is evaluated under the same deterministic, prefix-emitting execution model used at inference.
 As a result, it directly reflects interface-level efficiency improvements rather than abstract substring statistics.
+In our implementation, we estimate gains by executing the current tokenizer on the training corpus, collecting statistics over contract-feasible adjacent token pairs under the deployed policy, and evaluating candidate concatenations by their induced reduction in token count.
 
 \subsection{Greedy Construction under Interface Constraints}
 \label{sec:greedy}
@@ -358,13 +370,14 @@ This compilation eliminates dynamic control flow, guarantees linear-time executi
 \label{sec:experiments}
 
 We evaluate Controlled Interface Tokenization (CIT) through a sequence of studies designed to isolate interface effects and assess their impact from mechanism to system level.
-Our evaluation addresses five questions:
+Our evaluation addresses six questions:
 
 \begin{itemize}
 \item \textbf{Interface mismatch:} Do off-the-shelf natural-language tokenizers incur excessive length tails and truncation on structured inputs?
 \item \textbf{Mechanism:} Can interface fragmentation cause prefix semantic collapse, and does CIT prevent it?
 \item \textbf{Learning impact:} Do interface improvements translate into better end-to-end learning under fixed compute budgets?
 \item \textbf{System trade-offs:} Does CIT improve accuracy--latency operating points in fully trained models?
+\item \textbf{Frontier:} How do interface-level rate, distortion, and tokenization-time trade-offs evolve with the vocabulary budget?
 \item \textbf{Generalization:} Do these trends hold beyond a single dataset?
 \end{itemize}
 
@@ -380,7 +393,7 @@ We report results on:
 (ii) CSIC 2010 HTTP anomaly detection, a public semi-structured security dataset with realistic drift,
 and (iii) OpenML Adult for system-level efficiency evaluation.
 Additional results are reported on Credit-G (German Credit) to assess generalization.
-Vocabulary-budget sweeps and implementation details are provided in the supplementary appendix.
+We additionally report a vocabulary-budget sweep that traces interface-level rate--distortion and tokenization-time frontiers (Section~\ref{sec:exp_frontier}); implementation details are provided in the supplementary appendix.
 
 \paragraph{Tokenizers.}
 We compare CIT against three budget-matched learned tokenizers: BPE, WordPiece, and Unigram, each trained on the task serialization with a fixed vocabulary size ($|\mathcal{V}|=2048$).
@@ -390,6 +403,8 @@ All tokenizers are deterministic and prefix-emitting.
 
 \paragraph{Training budgets and models.}
 Unless otherwise stated, experiments use token-fair budgets, where each run processes the same number of non-padding encoder tokens under a shared maximum sequence length.
+This control matches the dominant attention compute, but can induce different numbers of optimization steps because tokenizers produce different length distributions.
+We therefore also report step-fair controls where relevant.
 CSIC experiments use Tiny/Small encoders and a 10M-token budget ($L_{\max}=512$).
 System-level experiments on Adult use a 5M-token budget and additionally measure inference latency.
 We report mean $\pm$ standard deviation over three random seeds unless otherwise noted.
@@ -400,6 +415,7 @@ Drift accuracy is computed by evaluating trained models on the drifted inputs wi
 
 \paragraph{Metrics.}
 We report average token length (rate), tail length (P95), surrogate directed semantic distortion $\widehat{\Delta}(\tau)$, classification accuracy, drift accuracy, and where applicable, parameter count and P95 inference latency.
+We estimate $\widehat{\Delta}(\tau)$ using a teacher--student surrogate: a reference predictor observes raw prefixes while a matched-capacity student observes tokenized prefixes, and the average excess cross-entropy over prefixes is used as a proxy for interface-induced semantic loss.
 
 \subsection{Interface Mismatch of Off-the-Shelf Tokenizers}
 \label{sec:exp_off_the_shelf}
@@ -472,6 +488,16 @@ Overall, CIT shifts the accuracy--latency frontier toward more favorable operati
 \label{fig:e3_pareto}
 \end{figure*}
 
+\subsection{Vocabulary-Budget Frontier and Tokenization Time}
+\label{sec:exp_frontier}
+
+To directly connect the formulation in Section~\ref{sec:rate_distortion} to practice, we sweep vocabulary budgets $B \in \{256,512,1024,2048,4096\}$ on the Adult serialization and train CIT/BPE/WordPiece tokenizers on the same corpus.
+We report interface-level rate (avg./P95 length), surrogate distortion, and tokenization time under deterministic, prefix-emitting execution (Table~\ref{tab:frontier}).
+CIT is consistently fast to tokenize and, for moderate and larger vocabularies ($B\ge 512$), yields shorter sequences; beyond $B\ge 1024$ it also reduces distortion, indicating a better empirical frontier under deployment-aligned execution.
+At very small budgets, frequency-driven baselines can yield slightly lower distortion, consistent with CIT’s design choice of optimizing compression gain (rate) while using distortion as a post hoc interface metric.
+
+\input{Tables/frontier.tex}
+
 \subsection{Generalization to Additional Structured Datasets}
 \label{sec:exp_generalization}
 
@@ -479,6 +505,8 @@ Finally, we evaluate on additional public tabular datasets (Adult and Credit-G) 
 
 Across datasets, CIT consistently reduces token rate and surrogate distortion.
 Accuracy is maintained on Adult and slightly lower on Credit-G, indicating that efficiency gains do not guarantee uniform accuracy improvements but remain broadly applicable across structured domains.
+This pattern is consistent with the interface perspective: CIT is most beneficial when long-tail sequence length and boundary/role brittleness are first-order failure modes, while domains with less high-cardinality string structure may see smaller (or mixed) accuracy changes.
+These results reinforce that contract design is a modeling decision and should be tuned to the domain’s semantics and to which value spans are truly nuisance versus predictive.
 
 \input{Tables/uci.tex}
 
@@ -510,10 +538,14 @@ CIT requires an explicit contract; if the contract is underspecified (missing bo
 Typed-value integrity is also a modeling choice: if predictive signal genuinely lies \emph{inside} value strings (e.g., identifier prefixes or checksums that correlate with labels), treating them as atomic can hide useful structure.
 Finally, our directed semantic distortion is an evaluation tool; while it is designed to reflect interface-induced loss, any practical surrogate depends on the chosen teacher/student capacity and the data distribution.
 
+\paragraph{Towards automatic contracts.}
+While we treat the contract as a specified artifact, many structured deployments already expose schemas, grammars, and field validators that can be reused to derive role boundaries and value types.
+An important direction is contract-assistance tooling: automatically proposing candidate typed spans that dominate rate tails or that are brittle under benign re-serializations, then validating them through rate--distortion measurements.
+
 \paragraph{Practical guidance.}
 In deployments, the highest-leverage step is to define the serialization and contract as a versioned artifact alongside the model, and to audit it under realistic drift operators (e.g., benign re-serializations) before vocabulary induction.
 When contract design is unclear, a conservative workflow is to start with minimal hard constraints (obvious boundaries and typed spans), measure rate--distortion operating points, and iterate only where the interface demonstrably collapses semantics.
-We include additional controls, proofs, and vocabulary-budget sweeps in the supplementary appendix to support this workflow.
+We include additional controls, proofs, and extended context in the supplementary appendix to support this workflow.
 
 
 \section{Conclusion}
@@ -522,3 +554,4 @@ We include additional controls, proofs, and vocabulary-budget sweeps in the supp
 We formulated tokenization as controlled interface compression under a drop-in regime and introduced directed semantic distortion as a principled interface metric.
 We proposed Controlled Interface Tokenization, aligning feasible constraints, vocabulary induction, and deterministic execution.
 Across synthetic and public structured benchmarks, CIT improves rate--distortion trade-offs, downstream accuracy under matched training budgets, and robustness to re-serialization and prefix-limited prediction.
+More broadly, the interface perspective suggests that careful, versioned control of serialization and tokenization can be as important as model scaling in structured deployments.

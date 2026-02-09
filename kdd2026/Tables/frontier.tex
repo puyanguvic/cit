@@ -1,4 +1,4 @@
-\begin{table}[h]
+\begin{table}[t]
 \centering
 \scriptsize
 \setlength{\tabcolsep}{3.5pt}
@@ -27,6 +27,6 @@ Vocab & Tokenizer & avg\_len & p95\_len & Distortion $\hat{\Delta}$ & tokenize m
 4096 & WordPiece & 106.1 & 111 & 0.189 & 0.04 \\
 \bottomrule
 \end{tabular*}
-\caption{Appendix: vocab-budget frontier sweep. Vocabulary sizes are shown in increasing order. All configurations achieve the same accuracy (0.761); thus only efficiency and distortion metrics are reported. Within each vocabulary budget, tokenizers are ordered with CIT first. Best values (lower is better) are shown in bold.}
-\label{tab:appendix_frontier}
+\caption{Vocabulary-budget frontier sweep on Adult. We report interface-level rate (avg./P95 token length), surrogate distortion $\hat{\Delta}$, and tokenization time under deterministic, prefix-emitting execution. Within each vocabulary budget, best values (lower is better) are shown in bold.}
+\label{tab:frontier}
 \end{table}
