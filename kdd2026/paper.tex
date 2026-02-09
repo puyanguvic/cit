@@ -460,7 +460,7 @@ Figure~\ref{fig:e2_csic_budget_scaling} shows token-budget scaling, where CIT re
 \centering
 \includegraphics[width=\linewidth]{Figs/e2_csic_budget_scaling.pdf}
 \caption{Accuracy vs.\ token budget on CSIC (mean $\pm$ std.).}
-\Description{Two line charts (tiny and small models) showing accuracy versus token budget for five tokenizers (BPE, Bytes, CIT, Unigram, WordPiece). Solid lines denote test accuracy and dashed lines denote drift accuracy; CIT achieves the highest accuracy across budgets.}
+\Description{Line plot showing classification accuracy as a function of token budget for multiple tokenizers on the CSIC dataset. CIT achieves higher accuracy at lower token budgets compared to subword baselines.}
 \label{fig:e2_csic_budget_scaling}
 \end{figure}
 
@@ -481,7 +481,7 @@ Overall, CIT shifts the accuracy--latency frontier toward more favorable operati
 \centering
 \includegraphics[width=\linewidth]{Figs/e3_pareto_triptych.pdf}
 \caption{Accuracy vs.\ efficiency trade-offs on Adult.}
-\Description{Three-panel trade-off plot on Adult: accuracy versus average tokens per sample (rate), accuracy versus P95 latency in milliseconds (log-scaled x-axis), and accuracy versus parameter count. Points are colored by tokenizer (BPE, Bytes, CIT, Unigram, WordPiece) with circles for mini and squares for small models; connectors show the change from mini to small, and arrows indicate the preferred direction.}
+\Description{Three-panel figure comparing tokenizers on the Adult dataset, showing accuracy versus efficiency metrics such as sequence length and latency. CIT achieves similar accuracy with shorter sequences and lower latency.}
 \label{fig:e3_pareto}
 \end{figure*}
 
