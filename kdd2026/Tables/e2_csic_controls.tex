@@ -4,12 +4,13 @@
 \begin{table*}[t]
 \centering
 \small
-\setlength{\tabcolsep}{5.0pt}
+\setlength{\tabcolsep}{4.0pt}
 \renewcommand{\arraystretch}{1.05}
 \begin{minipage}[t]{0.485\textwidth}
 \centering
 \textbf{Token-fair (10M encoder tokens, $L_{\max}{=}512$)}\\[-0.35em]
-\begin{tabular}{llrrrr}
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{@{}llrrrr@{}}
 \toprule
 Model & Tokenizer & Acc. & Drift acc. & avg\_len & p95\_len \\
 \midrule
@@ -25,11 +26,13 @@ tiny & Unigram & $0.814 \pm 0.012$ & $0.812 \pm 0.011$ & $402.9 \pm 3.4$ & 599 \
 tiny & WordPiece & $0.887 \pm 0.016$ & $0.481 \pm 0.020$ & $330.1 \pm 1.3$ & 527 \\
 \bottomrule
 \end{tabular}
+}
 \end{minipage}\hfill
 \begin{minipage}[t]{0.485\textwidth}
 \centering
 \textbf{Step-fair (matched optimizer steps, $L_{\max}{=}512$)}\\[-0.35em]
-\begin{tabular}{llrrrr}
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{@{}llrrrr@{}}
 \toprule
 Model & Tokenizer & Acc. & Drift acc. & avg\_len & p95\_len \\
 \midrule
@@ -45,6 +48,7 @@ tiny & Unigram & $0.818$ & $0.816$ & 406.4 & 595 \\
 tiny & WordPiece & $0.890$ & $0.485$ & 329.4 & 526 \\
 \bottomrule
 \end{tabular}
+}
 \end{minipage}
 \caption{E2 (CSIC 2010 HTTP): token-fair end-to-end training and a step-fair control. Token-fair equalizes processed tokens, so lower-rate interfaces can take more steps; step-fair equalizes optimizer steps to separate step-count effects from interface correctness.}
 \label{tab:e2_csic_controls}

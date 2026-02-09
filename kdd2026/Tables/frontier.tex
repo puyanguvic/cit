@@ -2,8 +2,11 @@
 % Requires: \usepackage{booktabs}
 \begin{table}[t]
 \centering
-\small
-\begin{tabular}{rlrrrrr}
+\scriptsize
+\setlength{\tabcolsep}{3.5pt}
+\renewcommand{\arraystretch}{1.05}
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{@{}rlrrrrr@{}}
 \toprule
 Vocab & Tokenizer & Acc. & avg\_len & p95\_len & Distortion $\hat{\Delta}$ & tokenize ms/sample \\
 \midrule
@@ -24,6 +27,7 @@ Vocab & Tokenizer & Acc. & avg\_len & p95\_len & Distortion $\hat{\Delta}$ & tok
 512 & WordPiece & 0.761 & 108.1 & 114 & 0.178 & 0.05 \\
 \bottomrule
 \end{tabular}
+}
 \caption{Appendix: vocab-budget frontier sweep.}
 \label{tab:appendix_frontier}
 \end{table}

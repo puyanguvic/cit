@@ -3,8 +3,11 @@
 % Requires: \usepackage{booktabs}
 \begin{table}[t]
 \centering
-\small
-\begin{tabular}{lllrrrrr}
+\scriptsize
+\setlength{\tabcolsep}{3.5pt}
+\renewcommand{\arraystretch}{1.05}
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{@{}lllrrrrr@{}}
 \toprule
 Dataset & Split & Tokenizer & avg\_len & p95\_len & p99\_len & trunc\_rate@L$_{\max}$ (\%) & tokenize ms/sample \\
 \midrule
@@ -16,6 +19,7 @@ csic2010 & test & gpt4 & 359.5 & 547 & 639 & 7.3 & 0.21 \\
 csic2010 & test & grok1 & 374.7 & 563 & 663 & 9.8 & 0.15 \\
 \bottomrule
 \end{tabular}
+}
 \caption{E0: off-the-shelf tokenizer scan on CSIC 2010 under $L_{\max}{=}512$ (token length tails, truncation rates, and tokenization time).}
 \label{tab:e0_tokenizer_playground}
 \end{table}
