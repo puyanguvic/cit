@@ -1,25 +1,19 @@
-% Copied from appendix artifacts to promote into main paper (table-only).
-% Original source: results/paper/paper_artifacts/appendix/tables/e0_tokenizer_playground.tex
-% Requires: \usepackage{booktabs}
 \begin{table}[t]
 \centering
 \scriptsize
-\setlength{\tabcolsep}{3.5pt}
-\renewcommand{\arraystretch}{1.05}
-\resizebox{\columnwidth}{!}{%
-\begin{tabular}{@{}lllrrrrr@{}}
+\setlength{\tabcolsep}{4pt}
+\begin{tabular*}{\columnwidth}{@{\extracolsep{\fill}}lcccccc@{}}
 \toprule
-Dataset & Split & Tokenizer & avg\_len & p95\_len & p99\_len & trunc\_rate@L$_{\max}$ (\%) & tokenize ms/sample \\
+Tokenizer & Avg Len & P95 & P99 & Trunc@512 (\%) & Time (ms) \\
 \midrule
-csic2010 & test & bert-base-cased & 468.3 & 687 & 803 & 29.4 & 0.22 \\
-csic2010 & test & gpt2 & 413.9 & 620 & 723 & 25.2 & 0.19 \\
-csic2010 & test & gpt3 & 413.7 & 620 & 723 & 25.1 & 0.19 \\
-csic2010 & test & gpt35 & 359.5 & 547 & 639 & 7.3 & 0.21 \\
-csic2010 & test & gpt4 & 359.5 & 547 & 639 & 7.3 & 0.21 \\
-csic2010 & test & grok1 & 374.7 & 563 & 663 & 9.8 & 0.15 \\
+bert-base-cased & \textbf{468.3} & 687 & 803 & \textbf{29.4} & 0.22 \\
+gpt2            & 413.9 & 620 & 723 & \textbf{25.2} & 0.19 \\
+gpt3            & 413.7 & 620 & 723 & \textbf{25.1} & 0.19 \\
+grok1           & 374.7 & 563 & 663 & 9.8 & \textbf{0.15} \\
+gpt35           & 359.5 & 547 & 639 & 7.3 & 0.21 \\
+gpt4            & 359.5 & 547 & 639 & 7.3 & 0.21 \\
 \bottomrule
-\end{tabular}
-}
-\caption{E0: off-the-shelf tokenizer scan on CSIC 2010 under $L_{\max}{=}512$ (token length tails, truncation rates, and tokenization time).}
+\end{tabular*}
+\caption{Off-the-shelf tokenizers evaluated on the CSIC 2010 test set ($L_{\max}=512$). All standard tokenizers produce long sequences, with several exceeding 25\% truncation, indicating a substantial interface mismatch for structured HTTP data.}
 \label{tab:e0_tokenizer_playground}
 \end{table}
