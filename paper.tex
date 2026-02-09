@@ -723,11 +723,11 @@ We construct structured records whose labels depend on a role-specific signal pl
 We evaluate (i) surrogate directed semantic distortion (prefix-level information loss) and (ii) robustness under semantics-preserving re-serializations (field shuffling, whitespace/number-format normalization, and insertion of irrelevant dummy fields).
 
 This task exposes a sharp failure mode under deterministic prefix-emitting interfaces: budget-matched subword tokenizers collapse to near-chance accuracy, consistent with prefix semantic collapse induced by an interface that fragments and entangles role cues and high-cardinality spans.
-In contrast, CIT prevents collapse by enforcing typed-span integrity and role-aware boundaries, achieving perfect in-distribution accuracy and strong drift robustness at a substantially lower rate.
-The lossless byte-level interface preserves raw information but is prohibitively high-rate under a strict length cap, leading to truncation and poor downstream accuracy under compute-matched training.
+Table~\ref{tab:e1_synth} shows that BPE/WordPiece/Unigram achieve only $\approx$5\% test accuracy, while CIT achieves 100\% test accuracy and 82.6\% drift accuracy.
+Crucially, CIT attains this while using far fewer tokens on average (81 vs.\ 645--692 for learned subword baselines and 1{,}058 for bytes) and with substantially lower surrogate distortion, consistent with preventing interface-induced collapse rather than trading fidelity for compression.
 
 Results are summarized in Table~\ref{tab:e1_synth}.
-\input{results/Tables/e1_synth}
+\input{results/paper/paper_artifacts/main/tables/e1_synth.tex}
 
 Two ablations collapse back to chance: disabling typed-value normalization (\textsc{CIT\_no\_typed}) or disabling the contract (\textsc{CIT\_no\_contract}) removes the interface constraints that prevent collapse.
 Together, these results support a causal interpretation: the gains come from interface correctness, not from incidental frequency effects of a different vocabulary.
@@ -740,15 +740,15 @@ We train Tiny/Small encoder models end-to-end on CSIC 2010 HTTP anomaly detectio
 We also evaluate drift robustness under realistic, semantics-preserving re-serialization: reordering record-aware key--value groups and normalizing whitespace.
 
 Under token-fair training, CIT produces substantially shorter sequences than learned subword baselines (about 216 tokens on average vs.\ about 328 for BPE/WordPiece), increasing effective sample throughput under the same token budget.
-This shifts the accuracy--length frontier and yields large robustness gains under drift: CIT maintains its performance on the drift slice while standard subword baselines can suffer large drops.
+This shifts the accuracy--length frontier and yields large robustness gains under drift: CIT's drift accuracy matches its in-distribution accuracy (e.g., 0.918 $\pm$ 0.002 for Small), whereas BPE/WordPiece retain similar test accuracy but drop sharply under drift (e.g., 0.517 $\pm$ 0.018 and 0.492 $\pm$ 0.030).
 Compared to the lossless byte-level interface, CIT attains much higher accuracy and robustness at far lower rate by enforcing interface constraints rather than relying on lossless tokenization.
 
 Table~\ref{tab:e2_csic_token_fair} summarizes final accuracy, drift accuracy, and token-length statistics under token-fair training, and Figure~\ref{fig:e2_csic_token_fair_frontier_acc_vs_len} shows the resulting accuracy--length frontier.
-\input{results/Tables/e2_csic_token_fair}
+\input{results/paper/paper_artifacts/main/tables/e2_csic_token_fair.tex}
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=\linewidth]{results/Figs/e2_csic_token_fair_frontier_acc_vs_len.pdf}
+\includegraphics[width=\linewidth]{Figs/e2_csic_token_fair_frontier_acc_vs_len.pdf}
 \caption{E2 (CSIC 2010 HTTP) token-fair frontier (10M tokens, $L_{\max}{=}512$): accuracy vs.\ average sequence length. Filled markers show test accuracy and hollow markers show drift accuracy under semantics-preserving re-serialization; vertical segments visualize the robustness gap. Colors denote tokenizers and marker shapes denote model size.}
 \label{fig:e2_csic_token_fair_frontier_acc_vs_len}
 \end{figure}
@@ -760,7 +760,7 @@ We further run a token-budget sweep (1/2/5/10M tokens) to characterize how inter
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=\linewidth]{results/Figs/e2_csic_token_fair_frontier_acc_vs_len.pdf}
+\includegraphics[width=\linewidth]{Figs/e2_csic_budget_scaling.pdf}
 \caption{E2 (CSIC 2010 HTTP) token-budget sweep: accuracy as a function of token budget (log-scale). We report mean $\pm$ std.\ over seeds (0/1/2).}
 \label{fig:e2_csic_budget_scaling}
 \end{figure}
@@ -771,12 +771,12 @@ We further run a token-budget sweep (1/2/5/10M tokens) to characterize how inter
 E3 closes the loop at the system level by testing whether the interface improvements shift end-to-end accuracy--latency trade-offs under fully trained models.
 On OpenML Adult, we train each (tokenizer, model family) pair end-to-end under a fixed token budget (5M encoder tokens) and measure average/P95 sequence lengths and P95 forward-pass latency.
 
-CIT reduces average and tail sequence lengths relative to standard subword baselines (about 61 tokens on average vs.\ about 106 for BPE/WordPiece at the same vocabulary budget), yielding consistent latency reductions at comparable accuracy.
-The byte-level baseline provides a complementary operating point with high fidelity but substantially higher latency due to its rate.
+Table~\ref{tab:e3_pareto} shows that CIT reduces average length by $\approx$43\% versus BPE/WordPiece (60.6 vs.\ $\approx$106.4 tokens) and reduces P95 latency (e.g., Mini backbone: 1.24 $\pm$ 0.12\,ms vs.\ 1.48 $\pm$ 0.13\,ms for BPE) while matching accuracy.
+The byte-level baseline provides a complementary operating point with lossless segmentation but substantially higher latency due to its much higher rate.
 Overall, CIT improves operating points on the accuracy--latency frontier while also reducing surrogate distortion, indicating that efficiency gains do not come from collapsing task-relevant prefix information.
 
 Results are summarized in Table~\ref{tab:e3_pareto} and Figure~\ref{fig:e3_pareto}.
-\input{results/Tables/e3_pareto}
+\input{results/paper/paper_artifacts/main/tables/e3_pareto.tex}
 
 \begin{figure*}[t]
 \centering
