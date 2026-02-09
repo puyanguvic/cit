@@ -513,27 +513,24 @@ These results reinforce that contract design is a modeling decision and should b
 Taken together, our results indicate that interface mismatch can induce prefix semantic collapse under prefix-emitting execution, while contract-constrained tokenization improves rate--distortion and robustness trade-offs under strict drop-in budgets.
 
 \paragraph{What changes when tokenization is an interface.}
-Tokenization is not only a compression heuristic: under a strict drop-in regime it is a \emph{hard interface} that determines which prefix distinctions are even observable to the model.
-For structured streams, interface errors are often causal and irreversible (prefix semantic collapse), so improving the interface can be more effective than increasing model size or training compute under the same constraints.
+Tokenization is not only a compression heuristic: under a strict drop-in regime it is a \emph{hard interface} that determines which prefix distinctions reach the model.
+For structured streams, interface errors can be causal and irreversible, so fixing the interface can matter more than scaling the same model under the same constraints.
 
 \paragraph{When CIT helps (and why).}
-CIT is most appropriate when (i) semantics is role- and boundary-dependent (e.g., key/value and delimiter structure), (ii) high-cardinality values are frequent and span integrity matters, and (iii) deployment budgets make truncation and length tails a first-order concern.
-In these settings, frequency-driven subword merges can trade away role cues for compression, while byte-level interfaces preserve everything but waste rate.
-CIT targets the middle ground: it enforces role and typed-value constraints to prevent collapse, then uses deployment-aligned gain to recover efficiency.
+CIT is most appropriate when (i) semantics is role- and boundary-dependent (e.g., key/value structure), (ii) high-cardinality values are frequent and span integrity matters, and (iii) truncation and length tails are first-order concerns.
+In this regime, standard subword merges can blur roles for compression, while bytes preserve structure at high rate; CIT prevents collapse with explicit constraints and then recovers efficiency with deployment-aligned gain.
 
 \paragraph{Limitations and failure modes.}
 CIT requires an explicit contract; if the contract is underspecified (missing boundaries) or overspecified (forbidding useful merges), performance can degrade.
 Typed-value integrity is also a modeling choice: if predictive signal genuinely lies \emph{inside} value strings (e.g., identifier prefixes or checksums that correlate with labels), treating them as atomic can hide useful structure.
-Finally, our directed semantic distortion is an evaluation tool; while it is designed to reflect interface-induced loss, any practical surrogate depends on the chosen teacher/student capacity and the data distribution.
+Finally, directed semantic distortion is an evaluation tool; practical surrogates depend on the chosen teacher/student capacity and the data distribution.
 
 \paragraph{Towards automatic contracts.}
-While we treat the contract as a specified artifact, many structured deployments already expose schemas, grammars, and field validators that can be reused to derive role boundaries and value types.
-An important direction is contract-assistance tooling: automatically proposing candidate typed spans that dominate rate tails or that are brittle under benign re-serializations, then validating them through rate--distortion measurements.
+Many structured deployments already expose schemas, grammars, and validators; reusing them to propose and validate contracts via rate--distortion measurements is a promising direction.
 
 \paragraph{Practical guidance.}
-In deployments, the highest-leverage step is to define the serialization and contract as a versioned artifact alongside the model, and to audit it under realistic drift operators (e.g., benign re-serializations) before vocabulary induction.
-When contract design is unclear, a conservative workflow is to start with minimal hard constraints (obvious boundaries and typed spans), measure rate--distortion operating points, and iterate only where the interface demonstrably collapses semantics.
-We include additional controls, proofs, and extended context in the supplementary appendix to support this workflow.
+In deployments, the highest-leverage step is to version the serialization and contract alongside the model and audit it under realistic drift operators before vocabulary induction.
+When contract design is unclear, start with obvious boundaries and typed spans, measure rate--distortion operating points, and iterate only where the interface collapses semantics.
 
 
 \section{Conclusion}
