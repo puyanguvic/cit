@@ -439,7 +439,7 @@ Budget-matched subword tokenizers collapse to near-chance performance, consisten
 In contrast, CIT achieves perfect test accuracy and strong drift robustness while using substantially fewer tokens and lower surrogate distortion (Table~\ref{tab:e1_synth}).
 
 Ablation experiments show that removing typed-value normalization or contract constraints causes performance to collapse to baseline levels.
-These results support a causal interpretation: CIT’s gains arise from interface correctness rather than vocabulary frequency effects.
+These results support a causal interpretation: CIT's gains arise from interface correctness rather than vocabulary frequency effects.
 
 \input{Tables/e1_synth.tex}
 
@@ -455,7 +455,7 @@ CIT maintains performance under drift, whereas BPE and WordPiece experience larg
 Unigram is comparatively robust but less token-efficient.
 
 To separate step-count effects from interface effects, we additionally report a step-fair control.
-The control preserves CIT’s robustness while reducing token-fair accuracy gaps, indicating that robustness arises from interface quality and that part of the accuracy gain is attributable to improved token efficiency.
+The control preserves CIT's robustness while reducing token-fair accuracy gaps, indicating that robustness arises from interface quality and that part of the accuracy gain is attributable to improved token efficiency.
 
 \input{Tables/e2_csic_controls.tex}
 
@@ -494,7 +494,7 @@ Overall, CIT shifts the accuracy--latency frontier toward more favorable operati
 To directly connect the formulation in Section~\ref{sec:rate_distortion} to practice, we sweep vocabulary budgets $B \in \{256,512,1024,2048,4096\}$ on the Adult serialization and train CIT/BPE/WordPiece tokenizers on the same corpus.
 We report interface-level rate (avg./P95 length), surrogate distortion, and tokenization time under deterministic, prefix-emitting execution (Table~\ref{tab:frontier}).
 CIT is consistently fast to tokenize and, for moderate and larger vocabularies ($B\ge 512$), yields shorter sequences; beyond $B\ge 1024$ it also reduces distortion, indicating a better empirical frontier under deployment-aligned execution.
-At very small budgets, frequency-driven baselines can yield slightly lower distortion, consistent with CIT’s design choice of optimizing compression gain (rate) while using distortion as a post hoc interface metric.
+At very small budgets, frequency-driven baselines can yield slightly lower distortion, consistent with CIT's design choice of optimizing compression gain (rate) while using distortion as a post hoc interface metric.
 
 \input{Tables/frontier.tex}
 
@@ -506,26 +506,17 @@ Finally, we evaluate on additional public tabular datasets (Adult and Credit-G) 
 Across datasets, CIT consistently reduces token rate and surrogate distortion.
 Accuracy is maintained on Adult and slightly lower on Credit-G, indicating that efficiency gains do not guarantee uniform accuracy improvements but remain broadly applicable across structured domains.
 This pattern is consistent with the interface perspective: CIT is most beneficial when long-tail sequence length and boundary/role brittleness are first-order failure modes, while domains with less high-cardinality string structure may see smaller (or mixed) accuracy changes.
-These results reinforce that contract design is a modeling decision and should be tuned to the domain’s semantics and to which value spans are truly nuisance versus predictive.
+These results reinforce that contract design is a modeling decision and should be tuned to the domain's semantics and to which value spans are truly nuisance versus predictive.
 
 \input{Tables/uci.tex}
-
-\subsection{Summary}
-\label{sec:exp_summary}
-
-Taken together, the results establish a consistent causal chain.
-Off-the-shelf tokenizers exhibit substantial interface mismatch on structured inputs.
-In controlled settings, this mismatch leads to prefix semantic collapse, which CIT prevents through role- and type-aware constraints.
-Under matched compute budgets, these interface improvements translate into higher robustness and better sample efficiency.
-End-to-end evaluations show that CIT improves accuracy--latency trade-offs, and additional datasets confirm that the observed trends generalize beyond a single domain.
-
-
 
 \section{Discussion}
 \label{sec:discussion}
 
+Taken together, our results indicate that interface mismatch can induce prefix semantic collapse under prefix-emitting execution, while contract-constrained tokenization improves rate--distortion and robustness trade-offs under strict drop-in budgets.
+
 \paragraph{What changes when tokenization is an interface.}
-The main takeaway is that tokenization is not only a compression heuristic: under a strict drop-in regime it is a \emph{hard interface} that determines which prefix distinctions are even observable to the model.
+Tokenization is not only a compression heuristic: under a strict drop-in regime it is a \emph{hard interface} that determines which prefix distinctions are even observable to the model.
 For structured streams, interface errors are often causal and irreversible (prefix semantic collapse), so improving the interface can be more effective than increasing model size or training compute under the same constraints.
 
 \paragraph{When CIT helps (and why).}
