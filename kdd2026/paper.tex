@@ -170,7 +170,6 @@ Let $\mathcal{R}^\star(t)$ denote the Bayes risk at prefix length $t$,
 \mathcal{R}^\star(t)
 \;\triangleq\;
 \mathbb{E}\!\left[\ell\!\left(\mathcal{S}(X_{1:t}), Y\right)\right],
-\label{eq:bayes_raw}
 \label{eq:bayes_risk_raw}
 \end{equation}
 and let $\mathcal{R}_\tau(t)$ denote the minimum achievable risk when only the tokenized prefix is observed,
@@ -179,7 +178,6 @@ and let $\mathcal{R}_\tau(t)$ denote the minimum achievable risk when only the t
 \;\triangleq\;
 \min_{q \in \mathcal{Q}}
 \mathbb{E}\!\left[\ell\!\left(q(\,\cdot \mid Z^{(t)}), Y\right)\right].
-\label{eq:bayes_tok}
 \label{eq:bayes_risk_tok}
 \end{equation}
 The \emph{directed semantic distortion} of tokenizer $\tau$ is defined as the average excess risk over prefixes:
@@ -190,7 +188,6 @@ The \emph{directed semantic distortion} of tokenizer $\tau$ is defined as the av
 \frac{1}{T}\sum_{t=1}^{T}
 \big(\mathcal{R}_\tau(t) - \mathcal{R}^\star(t)\big)
 \right].
-\label{eq:distortion}
 \label{eq:semantic_distortion}
 \end{equation}
 
@@ -302,7 +299,6 @@ For a candidate token $c$ admissible under the interface contract, we define its
 G(c;\mathcal{V})
 \;\triangleq\;
 R(\tau_{\mathcal{V}}) - R(\tau_{\mathcal{V}\cup\{c\}}),
-\label{eq:gain}
 \label{eq:gain_def}
 \end{equation}
 that is, the reduction in expected token length when $c$ is added to the vocabulary and executed under deployed semantics.
@@ -320,7 +316,6 @@ c_k
 \;\in\;
 \arg\max_{c \in \mathcal{C}(\mathcal{V}_k)}
 G(c;\mathcal{V}_k),
-\label{eq:greedy}
 \label{eq:alg_selection_gain}
 \end{equation}
 where $\mathcal{C}(\mathcal{V}_k)$ denotes the set of contract-feasible candidates under the current vocabulary.
@@ -465,6 +460,7 @@ Figure~\ref{fig:e2_csic_budget_scaling} shows token-budget scaling, where CIT re
 \centering
 \includegraphics[width=\linewidth]{Figs/e2_csic_budget_scaling.pdf}
 \caption{Accuracy vs.\ token budget on CSIC (mean $\pm$ std.).}
+\Description{Two line charts (tiny and small models) showing accuracy versus token budget for five tokenizers (BPE, Bytes, CIT, Unigram, WordPiece). Solid lines denote test accuracy and dashed lines denote drift accuracy; CIT achieves the highest accuracy across budgets.}
 \label{fig:e2_csic_budget_scaling}
 \end{figure}
 
@@ -485,6 +481,7 @@ Overall, CIT shifts the accuracy--latency frontier toward more favorable operati
 \centering
 \includegraphics[width=\linewidth]{Figs/e3_pareto_triptych.pdf}
 \caption{Accuracy vs.\ efficiency trade-offs on Adult.}
+\Description{Three-panel trade-off plot on Adult: accuracy versus average tokens per sample (rate), accuracy versus P95 latency in milliseconds (log-scaled x-axis), and accuracy versus parameter count. Points are colored by tokenizer (BPE, Bytes, CIT, Unigram, WordPiece) with circles for mini and squares for small models; connectors show the change from mini to small, and arrows indicate the preferred direction.}
 \label{fig:e3_pareto}
 \end{figure*}
 
